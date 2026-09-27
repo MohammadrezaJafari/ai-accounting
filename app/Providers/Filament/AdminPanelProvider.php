@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use Filament\Enums\ThemeMode;
 use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -31,13 +32,14 @@ class AdminPanelProvider extends PanelProvider
             ->login()
             ->profile()
             ->colors([
-                'primary' => Color::Indigo,
+                'primary' => '#32946a',
                 'success' => Color::Emerald,
                 'warning' => Color::Amber,
                 'danger' => Color::Rose,
                 'info' => Color::Sky,
-                'gray' => Color::Slate,
+                'gray' => Color::Neutral,
             ])
+            ->defaultThemeMode(ThemeMode::Dark)
             ->font('Vazirmatn', url: '/fonts/vazirmatn/vazirmatn.css', provider: LocalFontProvider::class)
             ->sidebarCollapsibleOnDesktop()
             ->navigationGroups(['مالی', 'مشتریان', 'مدل‌ها', 'سیستم'])

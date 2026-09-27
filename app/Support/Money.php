@@ -37,7 +37,7 @@ final class Money
     }
 
     /**
-     * Human display: "$12.30" for amounts of a dollar or more, "$0.000125" (up to 6 decimals) below.
+     * Human display: "$12.30" for amounts of a cent or more, "$0.000125" (up to 6 decimals) below.
      */
     public static function format(?int $nanos): string
     {
@@ -45,7 +45,7 @@ final class Money
             return '—';
         }
 
-        $decimals = abs($nanos) >= 10 ** self::SCALE ? 2 : 6;
+        $decimals = $nanos === 0 || abs($nanos) >= 10 ** (self::SCALE - 2) ? 2 : 6;
         $value = BigDecimal::ofUnscaledValue($nanos, self::SCALE)->toScale($decimals, RoundingMode::HalfUp)->strippedOfTrailingZeros();
         $value = $value->getScale() < 2 ? $value->toScale(2) : $value;
         $sign = $value->isNegative() ? '-' : '';

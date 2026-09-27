@@ -31,9 +31,9 @@ class DailyProfitChart extends ChartWidget
 
         return [
             'datasets' => [
-                ['label' => 'دریافتی', 'data' => $days->map(fn ($d) => $usd((int) ($rows[$d]->charge ?? 0)))->all(), 'borderColor' => '#4f46e5'],
+                ['label' => 'دریافتی', 'data' => $days->map(fn ($d) => $usd((int) ($rows[$d]->charge ?? 0)))->all(), 'borderColor' => '#60a5fa'],
                 ['label' => 'هزینه', 'data' => $days->map(fn ($d) => $usd((int) ($rows[$d]->cost ?? 0)))->all(), 'borderColor' => '#f43f5e'],
-                ['label' => 'سود', 'data' => $days->map(fn ($d) => $usd((int) ($rows[$d]->charge ?? 0) - (int) ($rows[$d]->cost ?? 0)))->all(), 'borderColor' => '#10b981'],
+                ['label' => 'سود', 'data' => $days->map(fn ($d) => $usd((int) ($rows[$d]->charge ?? 0) - (int) ($rows[$d]->cost ?? 0)))->all(), 'borderColor' => '#32946a'],
             ],
             'labels' => $days->map(fn ($d) => substr($d, 5))->all(),
         ];

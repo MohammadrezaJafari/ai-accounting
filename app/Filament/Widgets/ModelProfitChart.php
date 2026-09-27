@@ -28,7 +28,7 @@ class ModelProfitChart extends ChartWidget
 
         return [
             'datasets' => [
-                ['label' => 'سود', 'data' => $rows->map(fn ($r) => (float) Money::toUsd((int) $r->profit))->all(), 'backgroundColor' => '#10b981'],
+                ['label' => 'سود', 'data' => $rows->map(fn ($r) => (float) Money::toUsd((int) $r->profit))->all(), 'backgroundColor' => '#32946a'],
             ],
             'labels' => $rows->pluck('model')->all(),
         ];
