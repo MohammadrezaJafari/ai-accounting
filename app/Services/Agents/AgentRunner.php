@@ -182,6 +182,8 @@ class AgentRunner
      */
     private function finish(AgentRun $run, string $status, ?string $report = null, int $items = 0, array $meta = [], ?string $error = null, array $data = []): void
     {
+        $cost = (int) $run->usageLogs()->sum('cost');
+
         $run->update([
             'status' => $status,
             'report' => $report,
@@ -189,7 +191,9 @@ class AgentRunner
             'items_found' => $items,
             'meta' => $meta,
             'error' => $error,
-            'cost' => (int) $run->usageLogs()->sum('cost'),
+            'cost' => $cost,
+            // A publisher pays for its agent's model calls, whatever the run delivered.
+            'publisher_cost' => $run->agent->publisher_organization_id ? $cost : 0,
             'finished_at' => now(),
         ]);
 

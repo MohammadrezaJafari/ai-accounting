@@ -8,8 +8,8 @@ use App\Models\AgentRun;
 /**
  * What an agent earns and costs, for setting unit prices: revenue is the paid value of used
  * units, cost includes every run's model calls (also runs that delivered nothing, and a
- * publisher's test runs) and the publisher's share is what the publisher is owed; the
- * margin is what is left.
+ * publisher's test runs) and the publisher's share is what the publisher is owed after its
+ * model costs are charged back; the margin is what is left.
  */
 class AgentStats
 {
@@ -19,13 +19,13 @@ class AgentStats
     public function for(Agent $agent): array
     {
         $runs = $agent->runs()->toBase()
-            ->selectRaw('COUNT(CASE WHEN status = ? AND units > 0 THEN 1 END) as reports, COALESCE(SUM(revenue), 0) as revenue, COALESCE(SUM(publisher_share), 0) as publisher_share, COALESCE(SUM(cost), 0) as cost', [AgentRun::STATUS_SUCCEEDED])
+            ->selectRaw('COUNT(CASE WHEN status = ? AND units > 0 THEN 1 END) as reports, COALESCE(SUM(revenue), 0) as revenue, COALESCE(SUM(publisher_share), 0) as publisher_share, COALESCE(SUM(publisher_cost), 0) as publisher_cost, COALESCE(SUM(cost), 0) as cost', [AgentRun::STATUS_SUCCEEDED])
             ->first();
 
         $costs = $agent->runs()->where('status', AgentRun::STATUS_SUCCEEDED)->where('trigger', '!=', AgentRun::TRIGGER_TEST)->orderBy('cost')->pluck('cost')->map(fn ($cost) => (int) $cost);
         $revenue = (int) $runs->revenue;
         $cost = (int) $runs->cost;
-        $publisherShare = (int) $runs->publisher_share;
+        $publisherShare = (int) $runs->publisher_share - (int) $runs->publisher_cost;
         $margin = $revenue - $cost - $publisherShare;
 
         return [

@@ -86,7 +86,7 @@ class AgentForm
                     TextInput::make('max_units_per_run')->label('حداکثر واحد در هر اجرا')->numeric()->minValue(1)->maxValue(1000)->default(1)->required()
                         ->helperText('ایجنت می‌تواند بگوید خروجی‌اش چند واحد می‌ارزد (مثلاً به ازای هر مورد پیدا شده)، تا این سقف.'),
                     TextInput::make('revenue_share')->label('سهم ناشر')->numeric()->minValue(0)->maxValue(100)->default(0)->suffix('٪')
-                        ->helperText('درصدی از درآمد که به ناشر ایجنت بدهکاریم.'),
+                        ->helperText('درصدی از درآمد که به ناشر ایجنت بدهکاریم. برای ناشرِ عضو پلتفرم، هزینهٔ مدل اجراها از این سهم کم می‌شود.'),
                     Select::make('model')->label('مدل پیش‌فرض')->searchable()
                         ->options(fn () => AiModel::query()->orderBy('public_id')->pluck('public_id', 'public_id'))
                         ->helperText('مدلی که ایجنت بدون تعیین model صدا می‌زند.'),

@@ -12,11 +12,12 @@ use Illuminate\Support\Str;
 /**
  * One execution of an agent instance. `revenue` is the paid value of the units it used and
  * `cost` what its model calls cost us (both nano-USD); `publisher_share` is the part of the
- * revenue owed to the agent's publisher.
+ * revenue owed to the agent's publisher and `publisher_cost` the model cost charged back to
+ * it, so the publisher earns the difference.
  * An HTTP agent gets a token for the run (stored hashed) to call our models and post its
  * result until `deadline_at`; `data` is the structured output it returned, if any.
  */
-#[Fillable(['agent_instance_id', 'agent_id', 'organization_id', 'status', 'trigger', 'units', 'revenue', 'publisher_share', 'cost', 'items_found', 'report', 'data', 'error', 'meta', 'started_at', 'deadline_at', 'finished_at'])]
+#[Fillable(['agent_instance_id', 'agent_id', 'organization_id', 'status', 'trigger', 'units', 'revenue', 'publisher_share', 'publisher_cost', 'cost', 'items_found', 'report', 'data', 'error', 'meta', 'started_at', 'deadline_at', 'finished_at'])]
 #[Hidden(['token_hash'])]
 class AgentRun extends Model
 {
@@ -48,6 +49,7 @@ class AgentRun extends Model
             'units' => 'integer',
             'revenue' => 'integer',
             'publisher_share' => 'integer',
+            'publisher_cost' => 'integer',
             'cost' => 'integer',
             'items_found' => 'integer',
             'meta' => 'array',
@@ -106,8 +108,11 @@ class AgentRun extends Model
         return $this->trigger === self::TRIGGER_TEST;
     }
 
+    /**
+     * What the platform keeps: revenue less the publisher's share and the model cost it bore itself.
+     */
     public function margin(): int
     {
-        return $this->revenue - $this->publisher_share - $this->cost;
+        return $this->revenue - $this->publisher_share - ($this->cost - $this->publisher_cost);
     }
 }

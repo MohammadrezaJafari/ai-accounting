@@ -28,7 +28,9 @@ class PublishersTable
                 TextColumn::make('name')->label('سازمان')->searchable()
                     ->description(fn (Organization $record) => $record->publisher_name),
                 TextColumn::make('published_agents_count')->label('ایجنت‌ها'),
-                TextColumn::make('earned')->label('درآمد ناشر')->state(fn (Organization $record) => Money::format($summary($record)['earned']))->extraAttributes(['dir' => 'ltr']),
+                TextColumn::make('share')->label('سهم فروش')->state(fn (Organization $record) => Money::format($summary($record)['share']))->extraAttributes(['dir' => 'ltr']),
+                TextColumn::make('model_cost')->label('هزینهٔ مدل')->state(fn (Organization $record) => Money::format($summary($record)['model_cost']))->extraAttributes(['dir' => 'ltr']),
+                TextColumn::make('earned')->label('درآمد خالص')->state(fn (Organization $record) => Money::format($summary($record)['earned']))->extraAttributes(['dir' => 'ltr']),
                 TextColumn::make('paid')->label('پرداخت‌شده')->state(fn (Organization $record) => Money::format($summary($record)['paid']))->extraAttributes(['dir' => 'ltr']),
                 TextColumn::make('balance')->label('مانده')
                     ->state(fn (Organization $record) => Money::format($summary($record)['balance']))

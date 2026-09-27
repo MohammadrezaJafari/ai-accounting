@@ -45,7 +45,7 @@ class AgentsTable
                 TextColumn::make('reports')->label('واحد فروخته‌شده')->state(fn (Agent $record) => $stats($record)['reports']),
                 TextColumn::make('revenue')->label('درآمد')->state(fn (Agent $record) => Money::format($stats($record)['revenue']))->extraAttributes(['dir' => 'ltr']),
                 TextColumn::make('cost')->label('هزینهٔ مدل')->state(fn (Agent $record) => Money::format($stats($record)['cost']))->extraAttributes(['dir' => 'ltr']),
-                TextColumn::make('publisher_share')->label('سهم ناشر')
+                TextColumn::make('publisher_share')->label('سهم خالص ناشر')
                     ->state(fn (Agent $record) => $record->revenue_share > 0 ? Money::format($stats($record)['publisher_share'])." ({$record->revenue_share}٪)" : '—')
                     ->extraAttributes(['dir' => 'ltr']),
                 TextColumn::make('margin')->label('سود')

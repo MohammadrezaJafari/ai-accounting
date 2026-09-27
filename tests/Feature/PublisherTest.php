@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\Agent;
 use App\Models\AgentCredit;
 use App\Models\AgentRun;
+use App\Models\AiModel;
 use App\Models\Organization;
+use App\Models\Provider;
 use App\Models\PublisherPayout;
 use App\Models\User;
 use App\Notifications\PublisherReviewNotification;
@@ -41,7 +43,13 @@ class PublisherTest extends TestCase
 
         // Publisher hosts resolve to a public address, except the internal one.
         $this->app->instance(UrlGuard::class, new UrlGuard(fn (string $host) => $host === 'internal.test' ? ['10.0.0.5'] : ['93.184.216.34']));
-        Http::fake(['agent.noa.test/*' => fn () => $this->reply]);
+        Http::fake([
+            'agent.noa.test/*' => fn () => $this->reply,
+            'api.openai.test/*' => Http::response([
+                'choices' => [['message' => ['role' => 'assistant', 'content' => 'ok']]],
+                'usage' => ['prompt_tokens' => 50_000, 'completion_tokens' => 0],
+            ]),
+        ]);
     }
 
     /**
@@ -203,5 +211,57 @@ class PublisherTest extends TestCase
         $this->patchJson('/api/v1/publisher', ['publisher_name' => 'نوآ', 'payout_details' => 'IR000'])->assertOk();
         $this->getJson('/api/v1/publisher')->assertJsonPath('profile.payout_details', 'IR000');
         $this->getJson('/api/v1/agents')->assertJsonPath('data.0.publisher.name', 'نوآ');
+    }
+
+    public function test_model_costs_are_charged_to_the_publisher(): void
+    {
+        $provider = Provider::query()->create(['slug' => 'openai', 'name' => 'OpenAI', 'base_url' => 'https://api.openai.test/v1']);
+        $provider->keys()->create(['name' => 'main', 'api_key' => 'sk-real']);
+        AiModel::query()->create([
+            'provider_id' => $provider->id, 'name' => 'mini', 'public_id' => 'gpt-4o-mini', 'upstream_id' => 'gpt-4o-mini',
+            'input_price' => Money::fromUsd('1'), 'output_price' => Money::fromUsd('2'),
+        ]);
+
+        $agent = $this->createListing();
+        $agent->update(['model' => 'gpt-4o-mini']);
+        $publishers = app(PublisherService::class);
+        $publishers->approve($publishers->submit($agent), 70);
+
+        $customer = Organization::factory()->create();
+        User::factory()->inOrganization($customer)->create();
+        $app = $customer->apps()->create(['name' => 'App']);
+        AgentCredit::query()->create(['organization_id' => $customer->id, 'agent_id' => $agent->id, 'units' => 50, 'value' => Money::fromUsd('10')]);
+        $instance = $customer->agentInstances()->create(['agent_id' => $agent->id, 'app_id' => $app->id, 'name' => 'مشتری‌یابی', 'config' => ['industry' => 'x']]);
+        $runner = app(AgentRunner::class);
+
+        // The agent accepts, calls a model ($0.05 of input) and delivers 5 units.
+        $this->reply = Http::response([], 202);
+        $run = $runner->execute($runner->start($instance, AgentRun::TRIGGER_MANUAL));
+        $auth = ['Authorization' => 'Bearer '.json_decode(Http::recorded()->last()[0]->body(), true)['platform']['token']];
+        $this->postJson('/agent-api/v1/chat/completions', ['messages' => [['role' => 'user', 'content' => 'x']]], $auth)->assertOk();
+        $this->postJson("/agent-api/runs/{$run->id}/result", ['status' => 'succeeded', 'report' => 'x', 'units' => 5], $auth)->assertOk();
+
+        $run->refresh();
+        $this->assertSame([Money::fromUsd('0.70'), Money::fromUsd('0.05'), Money::fromUsd('0.05')], [$run->publisher_share, $run->publisher_cost, $run->cost]);
+        $this->assertSame(Money::fromUsd('0.30'), $run->margin());
+
+        // A run that found nothing still costs the publisher its model calls.
+        $this->reply = Http::response([], 202);
+        $empty = $runner->execute($runner->start($instance, AgentRun::TRIGGER_MANUAL));
+        $auth = ['Authorization' => 'Bearer '.json_decode(Http::recorded()->last()[0]->body(), true)['platform']['token']];
+        $this->postJson('/agent-api/v1/chat/completions', ['messages' => [['role' => 'user', 'content' => 'x']]], $auth)->assertOk();
+        $this->postJson("/agent-api/runs/{$empty->id}/result", ['status' => 'empty'], $auth)->assertOk();
+        $this->assertSame([0, Money::fromUsd('0.05')], [$empty->refresh()->publisher_share, $empty->publisher_cost]);
+
+        $this->getJson('/api/v1/publisher')->assertOk()
+            ->assertJsonPath('summary.revenue', '1.00')
+            ->assertJsonPath('summary.share', '0.70')
+            ->assertJsonPath('summary.model_cost', '0.10')
+            ->assertJsonPath('summary.earned', '0.60')
+            ->assertJsonPath('summary.balance', '0.60');
+        $this->getJson("/api/v1/publisher/agents/{$agent->id}")->assertOk()
+            ->assertJsonPath('data.stats.share', '0.70')
+            ->assertJsonPath('data.stats.cost', '0.10')
+            ->assertJsonPath('data.stats.earned', '0.60');
     }
 }

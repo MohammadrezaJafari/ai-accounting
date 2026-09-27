@@ -170,7 +170,7 @@ class PublisherAgentController extends Controller
             'error' => $run->error,
             'notes' => $run->isTest() ? ($run->meta['notes'] ?? []) : [],
             'warnings' => $run->meta['errors'] ?? [],
-            'cost' => Money::toUsd($run->cost),
+            'cost' => Money::toUsd($run->publisher_cost),
             'duration_ms' => $run->started_at && $run->finished_at ? (int) $run->started_at->diffInMilliseconds($run->finished_at) : null,
             'created_at' => $run->created_at,
         ];

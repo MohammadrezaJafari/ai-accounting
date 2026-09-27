@@ -9,34 +9,41 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * What a publisher's agents sold and earned. Earnings are the `publisher_share` recorded on
- * each paid run; the balance is what has not been paid out yet. Test runs never count.
+ * What a publisher's agents sold and earned. Each run records the publisher's share of its
+ * revenue and the model cost charged back to it (every run, test runs included); earnings are
+ * the difference and the balance is what has not been paid out yet (it can be negative).
  */
 class PublisherEarnings
 {
     /**
-     * @return array{units: int, revenue: int, earned: int, paid: int, balance: int, customers: int, live_agents: int}
+     * @return array{units: int, revenue: int, share: int, model_cost: int, earned: int, paid: int, balance: int, customers: int, live_agents: int}
      */
     public function summary(Organization $publisher): array
     {
-        $totals = $this->paidRuns($publisher)->toBase()
-            ->selectRaw('COALESCE(SUM(units), 0) as units, COALESCE(SUM(revenue), 0) as revenue, COALESCE(SUM(publisher_share), 0) as earned, COUNT(DISTINCT organization_id) as customers')
+        $sales = $this->paidRuns($publisher)->toBase()
+            ->selectRaw('COALESCE(SUM(units), 0) as units, COALESCE(SUM(revenue), 0) as revenue, COUNT(DISTINCT organization_id) as customers')
             ->first();
+        $ledger = $this->runs($publisher)->toBase()
+            ->selectRaw('COALESCE(SUM(publisher_share), 0) as share, COALESCE(SUM(publisher_cost), 0) as model_cost')
+            ->first();
+        $earned = (int) $ledger->share - (int) $ledger->model_cost;
         $paid = (int) $publisher->payouts()->sum('amount');
 
         return [
-            'units' => (int) $totals->units,
-            'revenue' => (int) $totals->revenue,
-            'earned' => (int) $totals->earned,
+            'units' => (int) $sales->units,
+            'revenue' => (int) $sales->revenue,
+            'share' => (int) $ledger->share,
+            'model_cost' => (int) $ledger->model_cost,
+            'earned' => $earned,
             'paid' => $paid,
-            'balance' => (int) $totals->earned - $paid,
-            'customers' => (int) $totals->customers,
+            'balance' => $earned - $paid,
+            'customers' => (int) $sales->customers,
             'live_agents' => $publisher->publishedAgents()->active()->count(),
         ];
     }
 
     /**
-     * Earnings per day (Tehran time) over the last `$days` days, oldest first.
+     * Net earnings per day (Tehran time) over the last `$days` days, oldest first.
      *
      * @return list<array{date: string, earned: int, units: int}>
      */
@@ -50,13 +57,13 @@ class PublisherEarnings
             $series[$start->addDays($day)->toDateString()] = ['date' => $start->addDays($day)->toDateString(), 'earned' => 0, 'units' => 0];
         }
 
-        $this->paidRuns($publisher)->where('created_at', '>=', $start->utc())->get(['created_at', 'units', 'publisher_share'])
+        $this->runs($publisher)->where('created_at', '>=', $start->utc())->get(['created_at', 'trigger', 'units', 'publisher_share', 'publisher_cost'])
             ->each(function (AgentRun $run) use (&$series, $timezone) {
                 $date = $run->created_at->setTimezone($timezone)->toDateString();
 
                 if (isset($series[$date])) {
-                    $series[$date]['earned'] += $run->publisher_share;
-                    $series[$date]['units'] += $run->units;
+                    $series[$date]['earned'] += $run->publisher_share - $run->publisher_cost;
+                    $series[$date]['units'] += $run->isTest() ? 0 : $run->units;
                 }
             });
 
@@ -64,15 +71,19 @@ class PublisherEarnings
     }
 
     /**
-     * How one agent is doing: sales, earnings, model cost and how its runs end.
+     * How one agent is doing: sales, the publisher's share, model cost (test runs included)
+     * and net earnings, and how its customers' runs end.
      *
-     * @return array{units: int, revenue: int, earned: int, cost: int, customers: int, active_instances: int, runs: array<string, int>, failure_rate: ?float}
+     * @return array{units: int, revenue: int, share: int, cost: int, earned: int, customers: int, active_instances: int, runs: array<string, int>, failure_rate: ?float}
      */
     public function forAgent(Agent $agent): array
     {
         $runs = $agent->runs()->where('trigger', '!=', AgentRun::TRIGGER_TEST);
         $totals = (clone $runs)->toBase()
-            ->selectRaw('COALESCE(SUM(units), 0) as units, COALESCE(SUM(revenue), 0) as revenue, COALESCE(SUM(publisher_share), 0) as earned, COALESCE(SUM(cost), 0) as cost, COUNT(DISTINCT organization_id) as customers')
+            ->selectRaw('COALESCE(SUM(units), 0) as units, COALESCE(SUM(revenue), 0) as revenue, COUNT(DISTINCT organization_id) as customers')
+            ->first();
+        $ledger = $agent->runs()->toBase()
+            ->selectRaw('COALESCE(SUM(publisher_share), 0) as share, COALESCE(SUM(publisher_cost), 0) as cost')
             ->first();
         $statuses = (clone $runs)->toBase()->selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status')->map(fn ($total) => (int) $total);
         $finished = $statuses->only([AgentRun::STATUS_SUCCEEDED, AgentRun::STATUS_EMPTY, AgentRun::STATUS_FAILED])->sum();
@@ -80,8 +91,9 @@ class PublisherEarnings
         return [
             'units' => (int) $totals->units,
             'revenue' => (int) $totals->revenue,
-            'earned' => (int) $totals->earned,
-            'cost' => (int) $totals->cost,
+            'share' => (int) $ledger->share,
+            'cost' => (int) $ledger->cost,
+            'earned' => (int) $ledger->share - (int) $ledger->cost,
             'customers' => (int) $totals->customers,
             'active_instances' => $agent->instances()->where('is_test', false)->where('is_active', true)->count(),
             'runs' => $statuses->all(),
@@ -89,11 +101,19 @@ class PublisherEarnings
         ];
     }
 
+    /**
+     * Every run of the publisher's agents, test runs included.
+     */
+    private function runs(Organization $publisher): Builder
+    {
+        return AgentRun::query()->whereIn('agent_id', $publisher->publishedAgents()->select('id'));
+    }
+
+    /**
+     * Runs customers paid for.
+     */
     private function paidRuns(Organization $publisher): Builder
     {
-        return AgentRun::query()
-            ->whereIn('agent_id', $publisher->publishedAgents()->select('id'))
-            ->where('trigger', '!=', AgentRun::TRIGGER_TEST)
-            ->where('units', '>', 0);
+        return $this->runs($publisher)->where('trigger', '!=', AgentRun::TRIGGER_TEST)->where('units', '>', 0);
     }
 }

@@ -49,7 +49,9 @@ class PayoutsRelationManager extends RelationManager
         return $table
             ->defaultSort('paid_at', 'desc')
             ->description(fn () => sprintf(
-                'درآمد ناشر: %s — پرداخت‌شده: %s — مانده: %s',
+                'سهم فروش: %s — هزینهٔ مدل: %s — درآمد خالص: %s — پرداخت‌شده: %s — مانده: %s',
+                Money::format($summary()['share']),
+                Money::format($summary()['model_cost']),
                 Money::format($summary()['earned']),
                 Money::format($summary()['paid']),
                 Money::format($summary()['balance']),

@@ -49,6 +49,7 @@ class PublisherAgentResource extends JsonResource
             'stats' => $this->when(isset($this->stats), fn () => [
                 ...$this->stats,
                 'revenue' => Money::toUsd($this->stats['revenue']),
+                'share' => Money::toUsd($this->stats['share']),
                 'earned' => Money::toUsd($this->stats['earned']),
                 'cost' => Money::toUsd($this->stats['cost']),
             ]),
