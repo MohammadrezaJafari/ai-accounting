@@ -9,9 +9,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * A listing as its publisher sees it: everything it may edit, the review state, the terms set
- * by the platform (revenue share, model access, cost cap) and the signing secret its service
- * checks requests with. `stats` is set by the controller when requested.
+ * A listing as its publisher sees it: everything it may edit, the review state, the terms
+ * (revenue share, model access, its own cost cap and the ceiling for it) and the signing
+ * secret its service checks requests with. `stats` is set by the controller when requested.
  */
 class PublisherAgentResource extends JsonResource
 {
@@ -43,6 +43,7 @@ class PublisherAgentResource extends JsonResource
             'terms' => [
                 'revenue_share' => $this->revenue_share,
                 'max_cost_per_run' => $this->max_cost_per_run === null ? null : Money::toUsd($this->max_cost_per_run),
+                'max_cost_ceiling' => Money::toUsd($this->costCeiling()),
                 'default_model' => $this->model,
                 'allowed_models' => $this->allowed_models ?? [],
             ],
@@ -52,6 +53,8 @@ class PublisherAgentResource extends JsonResource
                 'share' => Money::toUsd($this->stats['share']),
                 'earned' => Money::toUsd($this->stats['earned']),
                 'cost' => Money::toUsd($this->stats['cost']),
+                'avg_run_cost' => $this->stats['avg_run_cost'] === null ? null : Money::toUsd($this->stats['avg_run_cost']),
+                'max_run_cost' => $this->stats['max_run_cost'] === null ? null : Money::toUsd($this->stats['max_run_cost']),
             ]),
             'created_at' => $this->created_at,
         ];

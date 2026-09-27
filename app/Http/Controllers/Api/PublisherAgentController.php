@@ -56,17 +56,14 @@ class PublisherAgentController extends Controller
 
     public function show(Request $request, Agent $agent): PublisherAgentResource
     {
-        $agent = $this->owned($request, $agent);
-        $agent->setAttribute('stats', $this->earnings->forAgent($agent));
-
-        return new PublisherAgentResource($agent);
+        return $this->resource($this->owned($request, $agent));
     }
 
     public function update(Request $request, Agent $agent): PublisherAgentResource
     {
         $agent = $this->owned($request, $agent);
 
-        return new PublisherAgentResource($this->publishers->update($agent, $this->validated($request, $agent))->refresh());
+        return $this->resource($this->publishers->update($agent, $this->validated($request, $agent))->refresh());
     }
 
     public function destroy(Request $request, Agent $agent): JsonResponse
@@ -81,7 +78,7 @@ class PublisherAgentController extends Controller
 
     public function submit(Request $request, Agent $agent): PublisherAgentResource
     {
-        return new PublisherAgentResource($this->publishers->submit($this->owned($request, $agent))->refresh());
+        return $this->resource($this->publishers->submit($this->owned($request, $agent))->refresh());
     }
 
     public function ping(Request $request, Agent $agent, HttpAgent $http): JsonResponse
@@ -98,7 +95,7 @@ class PublisherAgentController extends Controller
         $agent = $this->owned($request, $agent);
         $agent->forceFill(['signing_secret' => Agent::newSigningSecret()])->save();
 
-        return new PublisherAgentResource($agent);
+        return $this->resource($agent);
     }
 
     /**
@@ -176,6 +173,14 @@ class PublisherAgentController extends Controller
         ];
     }
 
+    /**
+     * The listing with its sales and cost figures.
+     */
+    private function resource(Agent $agent): PublisherAgentResource
+    {
+        return new PublisherAgentResource($agent->setAttribute('stats', $this->earnings->forAgent($agent)));
+    }
+
     private function owned(Request $request, Agent $agent): Agent
     {
         $this->authorizeTo(OrganizationPermission::PublishAgents);
@@ -207,7 +212,12 @@ class PublisherAgentController extends Controller
             'packages' => [$agent ? 'sometimes' : 'nullable', 'array', 'max:6'],
             'packages.*.units' => ['required', 'integer', 'between:1,100000', 'distinct'],
             'packages.*.price' => ['required', 'numeric', 'between:0.5,10000'],
-        ], attributes: ['packages.*.units' => 'تعداد واحد', 'packages.*.price' => 'قیمت']);
+            'max_cost_per_run' => ['sometimes', 'numeric', 'min:0.01', 'max:'.Money::toUsd($agent?->costCeiling() ?? (new Agent)->costCeiling())],
+        ], attributes: ['packages.*.units' => 'تعداد واحد', 'packages.*.price' => 'قیمت', 'max_cost_per_run' => 'سقف هزینهٔ مدل هر اجرا']);
+
+        if (array_key_exists('max_cost_per_run', $data)) {
+            $data['max_cost_per_run'] = Money::fromUsd((string) $data['max_cost_per_run']);
+        }
 
         if (array_key_exists('config_schema', $data)) {
             $data['config_schema'] = ConfigSchema::define($data['config_schema']);

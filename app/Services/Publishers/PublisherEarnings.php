@@ -74,7 +74,7 @@ class PublisherEarnings
      * How one agent is doing: sales, the publisher's share, model cost (test runs included)
      * and net earnings, and how its customers' runs end.
      *
-     * @return array{units: int, revenue: int, share: int, cost: int, earned: int, customers: int, active_instances: int, runs: array<string, int>, failure_rate: ?float}
+     * @return array{units: int, revenue: int, share: int, cost: int, earned: int, avg_run_cost: ?int, max_run_cost: ?int, customers: int, active_instances: int, runs: array<string, int>, failure_rate: ?float}
      */
     public function forAgent(Agent $agent): array
     {
@@ -85,6 +85,9 @@ class PublisherEarnings
         $ledger = $agent->runs()->toBase()
             ->selectRaw('COALESCE(SUM(publisher_share), 0) as share, COALESCE(SUM(publisher_cost), 0) as cost')
             ->first();
+        $runCosts = $agent->runs()->whereNotNull('finished_at')->where('publisher_cost', '>', 0)->toBase()
+            ->selectRaw('AVG(publisher_cost) as average, MAX(publisher_cost) as highest')
+            ->first();
         $statuses = (clone $runs)->toBase()->selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status')->map(fn ($total) => (int) $total);
         $finished = $statuses->only([AgentRun::STATUS_SUCCEEDED, AgentRun::STATUS_EMPTY, AgentRun::STATUS_FAILED])->sum();
 
@@ -94,6 +97,8 @@ class PublisherEarnings
             'share' => (int) $ledger->share,
             'cost' => (int) $ledger->cost,
             'earned' => (int) $ledger->share - (int) $ledger->cost,
+            'avg_run_cost' => $runCosts->average === null ? null : (int) round($runCosts->average),
+            'max_run_cost' => $runCosts->highest === null ? null : (int) $runCosts->highest,
             'customers' => (int) $totals->customers,
             'active_instances' => $agent->instances()->where('is_test', false)->where('is_active', true)->count(),
             'runs' => $statuses->all(),

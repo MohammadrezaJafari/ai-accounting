@@ -36,6 +36,8 @@ return [
     'publishers' => [
         'revenue_share' => (int) env('PUBLISHER_REVENUE_SHARE', 70),
         'max_cost_per_run_usd' => env('PUBLISHER_MAX_COST_PER_RUN_USD', '0.10'),
+        // The highest cap a publisher may set for itself, unless the admin sets another per agent.
+        'max_cost_ceiling_usd' => env('PUBLISHER_MAX_COST_CEILING_USD', '1.00'),
         'test_runs_per_day' => (int) env('PUBLISHER_TEST_RUNS_PER_DAY', 30),
         // Only for developing agents locally: lets publisher services run on private addresses.
         'allow_private_endpoints' => (bool) env('PUBLISHER_ALLOW_PRIVATE_ENDPOINTS', false),

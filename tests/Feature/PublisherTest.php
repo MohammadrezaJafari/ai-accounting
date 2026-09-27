@@ -227,6 +227,13 @@ class PublisherTest extends TestCase
         $publishers = app(PublisherService::class);
         $publishers->approve($publishers->submit($agent), 70);
 
+        // The publisher sets its own cap, up to the ceiling, and it applies without review.
+        $this->patchJson("/api/v1/publisher/agents/{$agent->id}", ['max_cost_per_run' => 5])->assertJsonValidationErrors('max_cost_per_run');
+        $this->patchJson("/api/v1/publisher/agents/{$agent->id}", ['max_cost_per_run' => '0.05'])->assertOk()
+            ->assertJsonPath('data.terms.max_cost_per_run', '0.05')
+            ->assertJsonPath('data.terms.max_cost_ceiling', '1.00')
+            ->assertJsonPath('data.pending_changes', null);
+
         $customer = Organization::factory()->create();
         User::factory()->inOrganization($customer)->create();
         $app = $customer->apps()->create(['name' => 'App']);
@@ -234,11 +241,12 @@ class PublisherTest extends TestCase
         $instance = $customer->agentInstances()->create(['agent_id' => $agent->id, 'app_id' => $app->id, 'name' => 'مشتری‌یابی', 'config' => ['industry' => 'x']]);
         $runner = app(AgentRunner::class);
 
-        // The agent accepts, calls a model ($0.05 of input) and delivers 5 units.
+        // The agent accepts, calls a model ($0.05 of input, which reaches the cap) and delivers 5 units.
         $this->reply = Http::response([], 202);
         $run = $runner->execute($runner->start($instance, AgentRun::TRIGGER_MANUAL));
         $auth = ['Authorization' => 'Bearer '.json_decode(Http::recorded()->last()[0]->body(), true)['platform']['token']];
         $this->postJson('/agent-api/v1/chat/completions', ['messages' => [['role' => 'user', 'content' => 'x']]], $auth)->assertOk();
+        $this->postJson('/agent-api/v1/chat/completions', ['messages' => [['role' => 'user', 'content' => 'x']]], $auth)->assertForbidden();
         $this->postJson("/agent-api/runs/{$run->id}/result", ['status' => 'succeeded', 'report' => 'x', 'units' => 5], $auth)->assertOk();
 
         $run->refresh();
@@ -262,6 +270,7 @@ class PublisherTest extends TestCase
         $this->getJson("/api/v1/publisher/agents/{$agent->id}")->assertOk()
             ->assertJsonPath('data.stats.share', '0.70')
             ->assertJsonPath('data.stats.cost', '0.10')
-            ->assertJsonPath('data.stats.earned', '0.60');
+            ->assertJsonPath('data.stats.earned', '0.60')
+            ->assertJsonPath('data.stats.avg_run_cost', '0.05');
     }
 }

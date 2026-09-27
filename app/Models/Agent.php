@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Support\AgentDriver;
 use App\Support\AgentStatus;
+use App\Support\Money;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,12 +23,13 @@ use Illuminate\Support\Str;
  * units one run may use, and `revenue_share` the publisher's percent of the revenue.
  *
  * A listing made by a publisher organization goes through review (`status`); once approved,
- * its changes wait in `pending_changes` until the admin applies them.
+ * its changes wait in `pending_changes` until the admin applies them. Its publisher pays for
+ * the model calls and sets `max_cost_per_run` itself, up to `costCeiling()`.
  */
 #[Fillable([
     'publisher_organization_id', 'slug', 'status', 'pending_changes', 'review_note', 'submitted_at', 'reviewed_at', 'driver', 'endpoint_url', 'timeout_seconds', 'run_deadline_minutes', 'config_schema',
     'name', 'tagline', 'icon', 'category', 'publisher_name', 'publisher_url', 'revenue_share',
-    'description', 'unit_name', 'max_units_per_run', 'model', 'allowed_models', 'max_cost_per_run', 'is_active', 'sort_order',
+    'description', 'unit_name', 'max_units_per_run', 'model', 'allowed_models', 'max_cost_per_run', 'max_cost_ceiling', 'is_active', 'sort_order',
 ])]
 #[Hidden(['signing_secret'])]
 class Agent extends Model
@@ -70,6 +72,7 @@ class Agent extends Model
             'max_units_per_run' => 'integer',
             'revenue_share' => 'integer',
             'max_cost_per_run' => 'integer',
+            'max_cost_ceiling' => 'integer',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
@@ -110,6 +113,14 @@ class Agent extends Model
         }
 
         return $this->publisher_name;
+    }
+
+    /**
+     * The highest `max_cost_per_run` the publisher may set (nano-USD).
+     */
+    public function costCeiling(): int
+    {
+        return $this->max_cost_ceiling ?? Money::fromUsd(config('billing.publishers.max_cost_ceiling_usd'));
     }
 
     /**

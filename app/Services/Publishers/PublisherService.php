@@ -23,6 +23,7 @@ use NumberFormatter;
 /**
  * A publisher organization's marketplace listings: drafts it edits freely, submission for
  * review, changes to a live listing that wait for the admin, and test runs of its own agent.
+ * The model cost cap per run is the publisher's to set, within the admin's ceiling.
  */
 class PublisherService
 {
@@ -45,7 +46,7 @@ class PublisherService
                 'driver' => AgentDriver::Http,
                 'is_active' => false,
                 'revenue_share' => config('billing.publishers.revenue_share'),
-                'max_cost_per_run' => Money::fromUsd(config('billing.publishers.max_cost_per_run_usd')),
+                'max_cost_per_run' => $data['max_cost_per_run'] ?? Money::fromUsd(config('billing.publishers.max_cost_per_run_usd')),
                 'sort_order' => 100,
             ]);
 
@@ -63,6 +64,11 @@ class PublisherService
      */
     public function update(Agent $agent, array $data): Agent
     {
+        // The publisher's own spending limit changes nothing for customers: no review.
+        if (array_key_exists('max_cost_per_run', $data)) {
+            $agent->update(['max_cost_per_run' => $data['max_cost_per_run']]);
+        }
+
         $changes = Arr::only($data, [...Agent::PUBLISHER_FIELDS, 'packages']);
 
         if ($agent->status->isEditable()) {

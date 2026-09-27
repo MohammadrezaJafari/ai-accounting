@@ -94,7 +94,10 @@ class AgentForm
                         ->options(fn () => AiModel::query()->orderBy('public_id')->pluck('public_id', 'public_id'))
                         ->placeholder('همهٔ مدل‌های فعال'),
                     Fields::usd('max_cost_per_run')->label('سقف هزینهٔ مدل در هر اجرا')->minValue(0)->placeholder('بدون سقف')
-                        ->helperText('با رسیدن هزینه به این مبلغ، درخواست‌های بعدی ایجنت به مدل رد می‌شوند.'),
+                        ->helperText('با رسیدن هزینه به این مبلغ، درخواست‌های بعدی ایجنت به مدل رد می‌شوند. ناشرِ عضو پلتفرم این سقف را خودش تعیین می‌کند.'),
+                    Fields::usd('max_cost_ceiling')->label('بیشترین سقفی که ناشر می‌تواند بگذارد')->minValue(0.01)
+                        ->placeholder(fn () => '$'.config('billing.publishers.max_cost_ceiling_usd').' (پیش‌فرض)')
+                        ->visible(fn (Get $get) => filled($get('publisher_organization_id'))),
                 ]),
 
                 Section::make('پارامترهای مشتری')->columnSpanFull()
