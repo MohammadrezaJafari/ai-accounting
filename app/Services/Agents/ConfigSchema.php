@@ -97,7 +97,11 @@ class ConfigSchema
                 'max' => is_numeric($field['max'] ?? null) ? $field['max'] + 0 : null,
                 'max_items' => is_numeric($field['max_items'] ?? null) ? max(1, (int) $field['max_items']) : null,
             ];
-            $definition['default'] = $type === 'secret' ? null : self::cast($definition, $field['default'] ?? null);
+            $definition['default'] = match ($type) {
+                'secret' => null,
+                'toggle' => self::cast($definition, $field['default'] ?? null) ?? false,
+                default => self::cast($definition, $field['default'] ?? null),
+            };
 
             $fields[$key] = $definition;
         }
@@ -151,6 +155,18 @@ class ConfigSchema
         }
 
         return $rules;
+    }
+
+    /**
+     * Field labels for validation messages.
+     *
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return collect($this->fields)
+            ->flatMap(fn (array $field) => ["config.{$field['key']}" => $field['label'], "config.{$field['key']}.*" => $field['label']])
+            ->all();
     }
 
     /**

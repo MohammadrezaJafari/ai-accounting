@@ -127,7 +127,7 @@ class AgentInstanceController extends Controller
             'notify_empty' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
             ...(! $instance || $request->has('config') ? $schema->rules($previous) : []),
-        ]);
+        ], attributes: $schema->attributes());
 
         if (! $instance || $request->has('config')) {
             $data['config'] = $schema->normalize($data['config'] ?? [], $previous);
