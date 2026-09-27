@@ -14,6 +14,30 @@ use Illuminate\Database\Seeder;
  */
 class CatalogSeeder extends Seeder
 {
+    /**
+     * Card tagline and whether the model is featured on the customer dashboard.
+     *
+     * @var array<string, array{0: string, 1: bool}>
+     */
+    private const DESCRIPTIONS = [
+        'gpt-5' => ['استدلال و کدنویسی پیشرفته', true],
+        'gpt-5-mini' => ['سریع و اقتصادی برای کارهای روزمره', false],
+        'gpt-5-nano' => ['ارزان‌ترین مدل OpenAI برای حجم بالا', false],
+        'gpt-4.1' => ['پنجرهٔ زمینهٔ یک میلیون توکنی', false],
+        'gpt-4.1-mini' => ['تعادل سرعت و کیفیت', false],
+        'gpt-4o' => ['چندوجهی: متن و تصویر', false],
+        'gpt-4o-mini' => ['سبک و ارزان', true],
+        'claude-opus-4-1' => ['استدلال و تحلیل پیشرفته', true],
+        'claude-sonnet-4-5' => ['کدنویسی و ایجنت‌ها', true],
+        'claude-haiku-4-5' => ['سریع‌ترین مدل Claude', false],
+        'gemini-2.5-pro' => ['تحلیل اسناد و زمینهٔ بلند', true],
+        'gemini-2.5-flash' => ['سریع با قیمت مناسب', false],
+        'gemini-2.5-flash-lite' => ['اقتصادی برای حجم بالا', false],
+        'deepseek-chat' => ['ارزان و قوی برای گفت‌وگو', true],
+        'deepseek-reasoner' => ['مدل استدلالی DeepSeek', false],
+        'grok-4' => ['مدل پرچم‌دار xAI', false],
+    ];
+
     public function run(): void
     {
         $providers = [
@@ -61,6 +85,8 @@ class CatalogSeeder extends Seeder
                 'name' => $name,
                 'upstream_id' => $upstreamId,
                 'context_window' => $context,
+                'description' => self::DESCRIPTIONS[$publicId][0] ?? null,
+                'is_featured' => self::DESCRIPTIONS[$publicId][1] ?? false,
                 'input_price' => Money::fromUsd($input),
                 'output_price' => Money::fromUsd($output),
                 'cached_input_price' => Money::fromUsd($cached),

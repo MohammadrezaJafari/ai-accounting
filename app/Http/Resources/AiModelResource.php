@@ -24,6 +24,7 @@ class AiModelResource extends JsonResource
         return [
             'id' => $model->id,
             'name' => $model->name,
+            'description' => $model->description,
             'public_id' => $model->public_id,
             'provider' => $model->relationLoaded('provider') ? [
                 'id' => $model->provider->id,
@@ -33,6 +34,7 @@ class AiModelResource extends JsonResource
             ] : null,
             'context_window' => $model->context_window,
             'is_active' => $model->is_active,
+            'is_featured' => $model->is_featured,
             'price' => array_map(Money::toUsd(...), $pricing->sellPrices($model, $forApp)),
         ];
 

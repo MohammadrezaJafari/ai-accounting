@@ -15,6 +15,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Hidden(['key_hash'])]
 class AppApiKey extends Model
 {
+    /** Key the panel chat bills through; created on first use. */
+    public const PLAYGROUND_NAME = 'چت پنل';
+
     protected function casts(): array
     {
         return [

@@ -12,10 +12,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * `sell_*_price` optionally pins the customer price instead of using a markup.
  */
 #[Fillable([
-    'provider_id', 'name', 'public_id', 'upstream_id', 'context_window',
+    'provider_id', 'name', 'description', 'public_id', 'upstream_id', 'context_window',
     'input_price', 'output_price', 'cached_input_price', 'cache_write_price',
     'markup_bps', 'sell_input_price', 'sell_output_price', 'sell_cached_input_price', 'sell_cache_write_price',
-    'is_active',
+    'is_active', 'is_featured',
 ])]
 class AiModel extends Model
 {
@@ -30,6 +30,7 @@ class AiModel extends Model
             'markup_bps' => 'integer',
             'context_window' => 'integer',
             'is_active' => 'boolean',
+            'is_featured' => 'boolean',
         ];
     }
 

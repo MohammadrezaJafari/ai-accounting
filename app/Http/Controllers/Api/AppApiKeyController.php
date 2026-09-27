@@ -16,6 +16,16 @@ class AppApiKeyController extends Controller
 {
     use Concerns;
 
+    /**
+     * Every key of every app the user owns.
+     */
+    public function all(Request $request): AnonymousResourceCollection
+    {
+        return AppApiKeyResource::collection(
+            AppApiKey::query()->with('app')->whereIn('app_id', $request->user()->apps()->select('id'))->latest('id')->get()
+        );
+    }
+
     public function index(Request $request, App $app): AnonymousResourceCollection
     {
         return AppApiKeyResource::collection($this->ownedApp($request, $app)->apiKeys()->latest()->get());

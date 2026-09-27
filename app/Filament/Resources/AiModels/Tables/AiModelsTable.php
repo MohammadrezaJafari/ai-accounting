@@ -38,11 +38,13 @@ class AiModelsTable
                     ->state(fn (AiModel $record) => (app(PricingService::class)->markupBps($record) / 100).'٪')
                     ->description(fn (AiModel $record) => $record->markup_bps === null ? 'ارثی' : 'اختصاصی'),
                 TextColumn::make('context_window')->label('زمینه')->numeric()->toggleable(isToggledHiddenByDefault: true),
+                ToggleColumn::make('is_featured')->label('ویژه'),
                 ToggleColumn::make('is_active')->label('فعال'),
             ])
             ->filters([
                 SelectFilter::make('provider_id')->label('ارائه‌دهنده')->relationship('provider', 'name'),
                 TernaryFilter::make('is_active')->label('فعال'),
+                TernaryFilter::make('is_featured')->label('ویژه'),
             ])
             ->recordActions([
                 EditAction::make(),

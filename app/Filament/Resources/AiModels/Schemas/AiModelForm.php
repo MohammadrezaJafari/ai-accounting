@@ -25,6 +25,8 @@ class AiModelForm
                 Section::make('مشخصات')->columns(2)->columnSpanFull()->schema([
                     Select::make('provider_id')->label('ارائه‌دهنده')->relationship('provider', 'name')->required()->preload(),
                     TextInput::make('name')->label('نام نمایشی')->required()->maxLength(100),
+                    TextInput::make('description')->label('توضیح کوتاه')->maxLength(255)->columnSpanFull()
+                        ->helperText('زیر نام مدل در کارت‌های پنل مشتری نمایش داده می‌شود؛ مثل «استدلال و تحلیل پیشرفته».'),
                     TextInput::make('public_id')->label('شناسهٔ عمومی')->required()->maxLength(100)->unique(ignoreRecord: true)
                         ->regex('/^[A-Za-z0-9._:\/-]+$/')->extraInputAttributes(['dir' => 'ltr'])
                         ->helperText('نامی که اپ‌ها در فیلد model می‌فرستند.'),
@@ -32,6 +34,7 @@ class AiModelForm
                         ->helperText('نام واقعی مدل در API ارائه‌دهنده.'),
                     TextInput::make('context_window')->label('پنجرهٔ زمینه (توکن)')->numeric()->minValue(0),
                     Toggle::make('is_active')->label('فعال')->default(true)->inline(false),
+                    Toggle::make('is_featured')->label('ویژه (نمایش در داشبورد مشتری)')->inline(false),
                 ]),
                 Section::make('قیمت خرید (هزینهٔ واقعی)')->description('دلار به ازای هر ۱ میلیون توکن، طبق قیمت رسمی ارائه‌دهنده.')
                     ->columns(4)->columnSpanFull()->schema([

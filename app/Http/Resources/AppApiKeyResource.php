@@ -13,6 +13,7 @@ class AppApiKeyResource extends JsonResource
         return [
             'id' => $this->id,
             'app_id' => $this->app_id,
+            'app' => $this->whenLoaded('app', fn () => ['id' => $this->app->id, 'name' => $this->app->name]),
             'name' => $this->name,
             'key_prefix' => $this->key_prefix,
             'allowed_providers' => $this->allowed_providers,

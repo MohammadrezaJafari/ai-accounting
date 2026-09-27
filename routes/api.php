@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\PlaygroundController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -29,12 +30,14 @@ Route::prefix('v1')->group(function () {
         Route::get('catalog/packages', [CatalogController::class, 'packages']);
 
         Route::apiResource('apps', AppController::class);
+        Route::get('keys', [AppApiKeyController::class, 'all']);
         Route::get('apps/{app}/keys', [AppApiKeyController::class, 'index']);
         Route::post('apps/{app}/keys', [AppApiKeyController::class, 'store']);
         Route::patch('apps/{app}/keys/{key}', [AppApiKeyController::class, 'update']);
         Route::delete('apps/{app}/keys/{key}', [AppApiKeyController::class, 'destroy']);
         Route::get('apps/{app}/transactions', [AppActivityController::class, 'transactions']);
         Route::get('usage', [AppActivityController::class, 'usage']);
+        Route::post('apps/{app}/chat/completions', PlaygroundController::class)->middleware('throttle:60,1');
 
         Route::get('orders', [OrderController::class, 'index']);
         Route::post('orders', [OrderController::class, 'store']);
