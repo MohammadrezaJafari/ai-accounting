@@ -32,6 +32,11 @@ class Organization extends Model
         return $this->hasMany(App::class);
     }
 
+    public function agentInstances(): HasMany
+    {
+        return $this->hasMany(AgentInstance::class);
+    }
+
     public function invitations(): HasMany
     {
         return $this->hasMany(OrganizationInvitation::class);

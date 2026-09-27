@@ -1,0 +1,73 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+/**
+ * One execution of an agent instance. `revenue` is the paid value of the units it used and
+ * `cost` what its model calls cost us (both nano-USD); the difference is the margin.
+ */
+#[Fillable(['agent_instance_id', 'agent_id', 'organization_id', 'status', 'trigger', 'units', 'revenue', 'cost', 'items_found', 'report', 'error', 'meta', 'started_at', 'finished_at'])]
+class AgentRun extends Model
+{
+    public const STATUS_QUEUED = 'queued';
+
+    public const STATUS_RUNNING = 'running';
+
+    /** Delivered a unit (e.g. a report). */
+    public const STATUS_SUCCEEDED = 'succeeded';
+
+    /** Nothing new to report; no unit used. */
+    public const STATUS_EMPTY = 'empty';
+
+    /** Not run because the organization has no units left. */
+    public const STATUS_NO_CREDITS = 'no_credits';
+
+    public const STATUS_FAILED = 'failed';
+
+    public const TRIGGER_SCHEDULE = 'schedule';
+
+    public const TRIGGER_MANUAL = 'manual';
+
+    protected function casts(): array
+    {
+        return [
+            'units' => 'integer',
+            'revenue' => 'integer',
+            'cost' => 'integer',
+            'items_found' => 'integer',
+            'meta' => 'array',
+            'started_at' => 'datetime',
+            'finished_at' => 'datetime',
+        ];
+    }
+
+    public function instance(): BelongsTo
+    {
+        return $this->belongsTo(AgentInstance::class, 'agent_instance_id');
+    }
+
+    public function agent(): BelongsTo
+    {
+        return $this->belongsTo(Agent::class);
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    public function usageLogs(): HasMany
+    {
+        return $this->hasMany(UsageLog::class);
+    }
+
+    public function margin(): int
+    {
+        return $this->revenue - $this->cost;
+    }
+}

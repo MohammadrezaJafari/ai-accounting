@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * the difference is platform profit.
  */
 #[Fillable([
-    'request_id', 'app_id', 'app_api_key_id', 'ai_model_id', 'provider_id', 'endpoint', 'model', 'stream',
+    'request_id', 'app_id', 'app_api_key_id', 'agent_run_id', 'ai_model_id', 'provider_id', 'endpoint', 'model', 'stream',
     'input_tokens', 'cached_input_tokens', 'cache_write_tokens', 'output_tokens',
     'cost', 'charge', 'status_code', 'latency_ms', 'error', 'ip',
 ])]
@@ -37,6 +37,11 @@ class UsageLog extends Model
     public function app(): BelongsTo
     {
         return $this->belongsTo(App::class);
+    }
+
+    public function agentRun(): BelongsTo
+    {
+        return $this->belongsTo(AgentRun::class);
     }
 
     public function apiKey(): BelongsTo

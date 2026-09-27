@@ -9,6 +9,7 @@ use App\Filament\Resources\Apps\Pages\ListApps;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Organizations\Pages\EditOrganization;
 use App\Filament\Resources\Organizations\RelationManagers\MembersRelationManager;
+use App\Models\Agent;
 use App\Models\AiModel;
 use App\Models\Order;
 use App\Models\Organization;
@@ -18,6 +19,7 @@ use App\Services\OrderService;
 use App\Services\SettingsService;
 use App\Support\Money;
 use App\Support\OrganizationRole;
+use Database\Seeders\AgentSeeder;
 use Database\Seeders\CatalogSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -46,12 +48,14 @@ class AdminPanelTest extends TestCase
     {
         $app = Organization::factory()->create()->apps()->create(['name' => 'App']);
         $provider = Provider::query()->firstOrFail();
+        $this->seed(AgentSeeder::class);
+        $agent = Agent::query()->firstOrFail();
 
         $this->actingAs($this->admin);
 
         foreach (['/admin', '/admin/providers', "/admin/providers/{$provider->id}/edit", '/admin/models', '/admin/packages',
             '/admin/users', '/admin/apps', "/admin/apps/{$app->id}/edit", '/admin/orders', '/admin/usage', '/admin/billing-settings',
-            '/admin/organizations', "/admin/organizations/{$app->organization_id}/edit"] as $url) {
+            '/admin/organizations', "/admin/organizations/{$app->organization_id}/edit", '/admin/agents', "/admin/agents/{$agent->id}/edit"] as $url) {
             $this->get($url)->assertOk();
         }
     }

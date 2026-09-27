@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\AgentController;
+use App\Http\Controllers\Api\AgentInstanceController;
 use App\Http\Controllers\Api\AppActivityController;
 use App\Http\Controllers\Api\AppApiKeyController;
 use App\Http\Controllers\Api\AppController;
@@ -60,6 +62,13 @@ Route::prefix('v1')->group(function () {
         Route::delete('organization/invitations/{invitation}', [InvitationController::class, 'destroy']);
         Route::get('invitations/{token}', [InvitationController::class, 'show']);
         Route::post('invitations/{token}/accept', [InvitationController::class, 'accept']);
+
+        Route::get('agents', [AgentController::class, 'index']);
+        Route::post('agents/{agent}/purchase', [AgentController::class, 'purchase']);
+        Route::apiResource('agent-instances', AgentInstanceController::class)->parameters(['agent-instances' => 'agentInstance']);
+        Route::post('agent-instances/{agentInstance}/run', [AgentInstanceController::class, 'run'])->middleware('throttle:20,1');
+        Route::get('agent-instances/{agentInstance}/runs', [AgentInstanceController::class, 'runs']);
+        Route::get('agent-runs/{agentRun}', [AgentInstanceController::class, 'showRun']);
 
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::post('notifications/read', [NotificationController::class, 'markAllRead']);
