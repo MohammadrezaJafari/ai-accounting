@@ -115,7 +115,7 @@ class EditAgent extends EditRecord
         ];
         $show = fn (mixed $value) => e(is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) : (string) $value);
         $rows = collect($agent->pending_changes ?? [])->map(fn (mixed $value, string $key) => sprintf(
-            '<tr style="border-top:1px solid rgb(128 128 128 / .25)"><th style="padding:8px;vertical-align:top;text-align:start;white-space:nowrap">%s</th><td style="padding:8px;vertical-align:top;opacity:.65"><pre style="white-space:pre-wrap;font-size:12px;margin:0">%s</pre></td><td style="padding:8px;vertical-align:top"><pre style="white-space:pre-wrap;font-size:12px;margin:0">%s</pre></td></tr>',
+            '<tr style="border-top:1px solid rgb(128 128 128 / .25)"><th style="padding:8px;vertical-align:top;text-align:start;white-space:nowrap">%s</th><td style="padding:8px;vertical-align:top;opacity:.65"><pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;margin:0">%s</pre></td><td style="padding:8px;vertical-align:top"><pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;margin:0">%s</pre></td></tr>',
             e($labels[$key] ?? $key),
             $show($key === 'packages' ? app(PublisherService::class)->currentPackages($agent) : $agent->getAttribute($key)),
             $show($value),

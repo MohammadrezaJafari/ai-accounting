@@ -28,7 +28,7 @@ class AgentManifest
     public function fetch(string $url, bool $publicOnly = false): array
     {
         if ($publicOnly) {
-            $this->guard->assertPublic($url);
+            $this->guard->assertPublisherUrl($url);
         }
 
         try {

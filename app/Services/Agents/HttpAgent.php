@@ -89,7 +89,7 @@ class HttpAgent implements AgentHandler
 
         // A publisher's service must be on the public internet; the admin's may be internal.
         if ($agent->publisher_organization_id) {
-            $this->guard->assertPublic($agent->endpoint_url);
+            $this->guard->assertPublisherUrl($agent->endpoint_url);
         }
 
         $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

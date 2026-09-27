@@ -224,7 +224,7 @@ class PublisherAgentController extends Controller
     {
         return function (string $attribute, mixed $value, Closure $fail) {
             try {
-                app(UrlGuard::class)->assertPublic((string) $value);
+                app(UrlGuard::class)->assertPublisherUrl((string) $value);
             } catch (AgentException $e) {
                 $fail($e->getMessage());
             }

@@ -24,6 +24,16 @@ class UrlGuard
         ]));
     }
 
+    /**
+     * Like assertPublic, for addresses given by publishers; local development may allow private ones.
+     */
+    public function assertPublisherUrl(string $url): void
+    {
+        if (! config('billing.publishers.allow_private_endpoints')) {
+            $this->assertPublic($url);
+        }
+    }
+
     public function assertPublic(string $url): void
     {
         $parts = parse_url($url);
