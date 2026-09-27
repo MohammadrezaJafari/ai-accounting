@@ -41,7 +41,7 @@ class BillingApiTest extends TestCase
     {
         $user = User::factory()->create();
         $app = $user->apps()->create(['name' => 'App']);
-        $package = Package::query()->where('name', 'Business')->sole();
+        $package = Package::query()->where('name', 'سازمانی')->sole();
 
         Sanctum::actingAs($user);
         $this->postJson('/api/v1/orders', ['app_id' => $app->id, 'package_id' => $package->id])

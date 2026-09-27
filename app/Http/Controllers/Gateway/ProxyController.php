@@ -112,16 +112,26 @@ abstract class ProxyController extends Controller
             $error = null;
 
             try {
+                // Read byte-wise: a buffered fread() on the upstream stream waits to fill its
+                // buffer, which would hold back tokens. Each complete SSE line is forwarded at once.
+                $line = '';
                 while (! $body->eof()) {
-                    $chunk = $body->read(8192);
-                    $parser->feed($chunk);
+                    $byte = $body->read(1);
+                    $line .= $byte;
+
+                    if ($byte !== "\n" && ! $body->eof()) {
+                        continue;
+                    }
+
+                    $parser->feed($line);
 
                     if (connection_aborted()) {
                         $error = 'Client disconnected.';
                         break;
                     }
 
-                    echo $chunk;
+                    echo $line;
+                    $line = '';
                     if (ob_get_level() > 0) {
                         ob_flush();
                     }

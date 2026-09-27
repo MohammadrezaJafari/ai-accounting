@@ -69,9 +69,9 @@ class CatalogSeeder extends Seeder
         }
 
         $packages = [
-            ['Starter', 'Try it out', '5', '5', 1],
-            ['Pro', '5% bonus credit', '20', '21', 2],
-            ['Business', '10% bonus credit', '100', '110', 3],
+            ['شروع', 'برای امتحان و پروژه‌های کوچک', '5', '5', 1],
+            ['حرفه‌ای', '۵٪ اعتبار هدیه', '20', '21', 2],
+            ['سازمانی', '۱۰٪ اعتبار هدیه', '100', '110', 3],
         ];
 
         foreach ($packages as [$name, $description, $price, $credit, $order]) {
