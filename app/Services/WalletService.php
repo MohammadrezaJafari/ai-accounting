@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\DB;
 
 class WalletService
 {
+    public function __construct(private BudgetService $budgets) {}
+
     /**
      * Change an app balance and record it in the ledger. Negative amounts debit.
      */
@@ -45,6 +47,11 @@ class WalletService
         }
 
         App::query()->whereKey($app->id)->decrement('balance', $charge);
-        $key && AppApiKey::query()->whereKey($key->id)->increment('spent', $charge);
+        $this->budgets->record($app, $charge);
+
+        if ($key) {
+            AppApiKey::query()->whereKey($key->id)->increment('spent', $charge);
+            $this->budgets->record($key, $charge);
+        }
     }
 }

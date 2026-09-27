@@ -26,5 +26,8 @@ return [
 
     'api_key_prefix' => 'sk-aia-',
 
+    // Customer panel (ai-accounting-web-app) address, used in invitation links sent by email.
+    'panel_url' => env('PANEL_URL', env('APP_URL', 'http://localhost')),
+
     'upstream_timeout' => (int) env('GATEWAY_UPSTREAM_TIMEOUT', 600),
 ];

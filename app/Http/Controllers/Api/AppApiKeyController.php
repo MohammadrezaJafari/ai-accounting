@@ -7,33 +7,41 @@ use App\Http\Resources\AppApiKeyResource;
 use App\Models\App;
 use App\Models\AppApiKey;
 use App\Services\ApiKeyService;
+use App\Support\BudgetPeriod;
 use App\Support\Money;
+use App\Support\OrganizationPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\Rule;
 
 class AppApiKeyController extends Controller
 {
     use Concerns;
 
     /**
-     * Every key of every app the user owns.
+     * Every key of every app in the current organization.
      */
     public function all(Request $request): AnonymousResourceCollection
     {
+        $this->authorizeTo(OrganizationPermission::ManageKeys);
+
         return AppApiKeyResource::collection(
-            AppApiKey::query()->with('app')->whereIn('app_id', $request->user()->apps()->select('id'))->latest('id')->get()
+            AppApiKey::query()->with('app')->whereIn('app_id', $this->organization($request)->apps()->select('id'))->latest('id')->get()
         );
     }
 
     public function index(Request $request, App $app): AnonymousResourceCollection
     {
+        $this->authorizeTo(OrganizationPermission::ManageKeys);
+
         return AppApiKeyResource::collection($this->ownedApp($request, $app)->apiKeys()->latest()->get());
     }
 
     public function store(Request $request, App $app, ApiKeyService $keys): JsonResponse
     {
         $this->ownedApp($request, $app);
+        $this->authorizeTo(OrganizationPermission::ManageKeys);
 
         [$key, $plain] = $keys->create($app, $this->validated($request, true));
 
@@ -46,16 +54,18 @@ class AppApiKeyController extends Controller
     public function update(Request $request, App $app, AppApiKey $key): AppApiKeyResource
     {
         $this->ownedApp($request, $app);
+        $this->authorizeTo(OrganizationPermission::ManageKeys);
         abort_unless($key->app_id === $app->id, 404);
 
         $key->update($this->validated($request, false));
 
-        return new AppApiKeyResource($key);
+        return new AppApiKeyResource($key->refresh());
     }
 
     public function destroy(Request $request, App $app, AppApiKey $key): JsonResponse
     {
         $this->ownedApp($request, $app);
+        $this->authorizeTo(OrganizationPermission::ManageKeys);
         abort_unless($key->app_id === $app->id, 404);
         $key->delete();
 
@@ -71,6 +81,7 @@ class AppApiKeyController extends Controller
             'allowed_models' => ['nullable', 'array'],
             'allowed_models.*' => ['string', 'exists:ai_models,public_id'],
             'spend_limit' => ['nullable', 'numeric', 'min:0'],
+            'spend_limit_period' => ['sometimes', Rule::enum(BudgetPeriod::class)],
             'expires_at' => ['nullable', 'date'],
             'is_active' => ['sometimes', 'boolean'],
         ]);

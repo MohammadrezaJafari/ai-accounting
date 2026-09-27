@@ -32,7 +32,11 @@ class AuthenticateAppKey
         }
 
         if ($key->isOverSpendLimit()) {
-            return GatewayError::response($request, 402, 'This API key has reached its spend limit.', 'billing_error');
+            return GatewayError::response($request, 402, "This API key has reached its {$key->spend_limit_period->value} spend limit.", 'billing_error');
+        }
+
+        if ($key->app->isOverSpendLimit()) {
+            return GatewayError::response($request, 402, "This app has reached its {$key->app->spend_limit_period->value} spend limit.", 'billing_error');
         }
 
         if ($key->app->balance <= $this->settings->get('min_balance')) {

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Order;
+use App\Models\Organization;
 use App\Models\Package;
 use App\Models\User;
 use App\Support\Money;
@@ -39,8 +40,8 @@ class BillingApiTest extends TestCase
 
     public function test_package_order_stays_pending_until_approved(): void
     {
-        $user = User::factory()->create();
-        $app = $user->apps()->create(['name' => 'App']);
+        $user = User::factory()->inOrganization()->create();
+        $app = $user->currentOrganization->apps()->create(['name' => 'App']);
         $package = Package::query()->where('name', 'سازمانی')->sole();
 
         Sanctum::actingAs($user);
@@ -56,8 +57,8 @@ class BillingApiTest extends TestCase
     public function test_custom_amount_top_up_respects_limits(): void
     {
         config(['billing.payment_gateway' => 'fake']);
-        $user = User::factory()->create();
-        $app = $user->apps()->create(['name' => 'App']);
+        $user = User::factory()->inOrganization()->create();
+        $app = $user->currentOrganization->apps()->create(['name' => 'App']);
         Sanctum::actingAs($user);
 
         $this->postJson('/api/v1/orders', ['app_id' => $app->id, 'amount' => 1])->assertUnprocessable();
@@ -69,7 +70,7 @@ class BillingApiTest extends TestCase
 
     public function test_users_cannot_touch_other_users_apps(): void
     {
-        $other = User::factory()->create()->apps()->create(['name' => 'Theirs']);
+        $other = Organization::factory()->create()->apps()->create(['name' => 'Theirs']);
         Sanctum::actingAs(User::factory()->create());
 
         $this->getJson("/api/v1/apps/{$other->id}")->assertNotFound();

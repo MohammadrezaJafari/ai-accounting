@@ -36,8 +36,8 @@ class PlaygroundChatTest extends TestCase
             'usage' => ['prompt_tokens' => 1_000_000, 'completion_tokens' => 0],
         ])]);
 
-        $user = User::factory()->create();
-        $app = $user->apps()->create(['name' => 'App']);
+        $user = User::factory()->inOrganization()->create();
+        $app = $user->currentOrganization->apps()->create(['name' => 'App']);
         $app->forceFill(['balance' => Money::fromUsd('5')])->save();
         Sanctum::actingAs($user);
 
@@ -54,8 +54,8 @@ class PlaygroundChatTest extends TestCase
 
     public function test_panel_chat_requires_balance_and_ownership(): void
     {
-        $owner = User::factory()->create();
-        $app = $owner->apps()->create(['name' => 'App']);
+        $owner = User::factory()->inOrganization()->create();
+        $app = $owner->currentOrganization->apps()->create(['name' => 'App']);
 
         Sanctum::actingAs($owner);
         $this->postJson("/api/v1/apps/{$app->id}/chat/completions", ['model' => 'gpt-test', 'messages' => []])->assertStatus(402);

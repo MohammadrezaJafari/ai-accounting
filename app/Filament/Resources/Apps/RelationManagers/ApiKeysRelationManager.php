@@ -7,6 +7,8 @@ use App\Models\AiModel;
 use App\Models\AppApiKey;
 use App\Models\Provider;
 use App\Services\ApiKeyService;
+use App\Support\BudgetPeriod;
+use App\Support\Money;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -38,6 +40,8 @@ class ApiKeysRelationManager extends RelationManager
             ->components([
                 TextInput::make('name')->label('نام')->required()->maxLength(100),
                 Fields::usd('spend_limit')->label('سقف هزینه')->minValue(0)->placeholder('نامحدود'),
+                Select::make('spend_limit_period')->label('دورهٔ سقف')->options(BudgetPeriod::options())
+                    ->default(BudgetPeriod::Total->value)->selectablePlaceholder(false),
                 Select::make('allowed_providers')->label('فقط این ارائه‌دهنده‌ها')->multiple()
                     ->options(fn () => Provider::query()->pluck('name', 'slug'))->placeholder('همه'),
                 Select::make('allowed_models')->label('فقط این مدل‌ها')->multiple()->searchable()
@@ -59,7 +63,10 @@ class ApiKeysRelationManager extends RelationManager
                 TextColumn::make('allowed_providers')->label('ارائه‌دهنده‌ها')->badge()->placeholder('همه'),
                 TextColumn::make('allowed_models')->label('مدل‌ها')->badge()->placeholder('همه')->limitList(3),
                 Fields::usdColumn('spent')->label('هزینه‌شده'),
-                Fields::usdColumn('spend_limit')->label('سقف')->placeholder('نامحدود'),
+                TextColumn::make('spend_limit')->label('مصرف / سقف دوره')->placeholder('نامحدود')
+                    ->formatStateUsing(fn (AppApiKey $record) => Money::format($record->spentThisPeriod()).' / '.Money::format($record->spend_limit).' '.$record->spend_limit_period->label())
+                    ->color(fn (AppApiKey $record) => $record->isOverSpendLimit() ? 'danger' : null)
+                    ->extraAttributes(['dir' => 'ltr']),
                 TextColumn::make('last_used_at')->label('آخرین استفاده')->jalaliDateTime()->placeholder('—'),
                 TextColumn::make('expires_at')->label('انقضا')->jalaliDateTime()->placeholder('—')->toggleable(isToggledHiddenByDefault: true),
                 ToggleColumn::make('is_active')->label('فعال'),

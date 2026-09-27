@@ -6,12 +6,17 @@ use App\Http\Controllers\Api\AppController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\InvitationController;
+use App\Http\Controllers\Api\MemberController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\Api\PlaygroundController;
 use Illuminate\Support\Facades\Route;
 
 /*
 | Customer API for the Quasar web app (ai-accounting-web-app), authenticated with Sanctum tokens.
+| Everything is scoped to the user's current organization and limited by their role in it.
 | Administration happens in the Filament panel (/admin); the AI gateway lives in routes/gateway.php (/v1).
 */
 
@@ -21,7 +26,7 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/login', [AuthController::class, 'login']);
     });
 
-    Route::middleware(['auth:sanctum', 'active'])->group(function () {
+    Route::middleware(['auth:sanctum', 'active', 'organization'])->group(function () {
         Route::get('auth/me', [AuthController::class, 'me']);
         Route::post('auth/logout', [AuthController::class, 'logout']);
 
@@ -42,6 +47,22 @@ Route::prefix('v1')->group(function () {
         Route::get('orders', [OrderController::class, 'index']);
         Route::post('orders', [OrderController::class, 'store']);
         Route::post('orders/{order}/cancel', [OrderController::class, 'cancel']);
+
+        Route::get('organizations', [OrganizationController::class, 'index']);
+        Route::post('organizations', [OrganizationController::class, 'store']);
+        Route::post('organizations/{organization}/switch', [OrganizationController::class, 'switch']);
+        Route::patch('organization', [OrganizationController::class, 'update']);
+        Route::get('organization/members', [MemberController::class, 'index']);
+        Route::patch('organization/members/{member}', [MemberController::class, 'update']);
+        Route::delete('organization/members/{member}', [MemberController::class, 'destroy']);
+        Route::get('organization/invitations', [InvitationController::class, 'index']);
+        Route::post('organization/invitations', [InvitationController::class, 'store']);
+        Route::delete('organization/invitations/{invitation}', [InvitationController::class, 'destroy']);
+        Route::get('invitations/{token}', [InvitationController::class, 'show']);
+        Route::post('invitations/{token}/accept', [InvitationController::class, 'accept']);
+
+        Route::get('notifications', [NotificationController::class, 'index']);
+        Route::post('notifications/read', [NotificationController::class, 'markAllRead']);
 
     });
 });

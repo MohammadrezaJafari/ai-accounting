@@ -7,13 +7,17 @@ use App\Filament\Resources\AiModels\Pages\CreateAiModel;
 use App\Filament\Resources\Apps\Pages\EditApp;
 use App\Filament\Resources\Apps\Pages\ListApps;
 use App\Filament\Resources\Orders\Pages\ListOrders;
+use App\Filament\Resources\Organizations\Pages\EditOrganization;
+use App\Filament\Resources\Organizations\RelationManagers\MembersRelationManager;
 use App\Models\AiModel;
 use App\Models\Order;
+use App\Models\Organization;
 use App\Models\Provider;
 use App\Models\User;
 use App\Services\OrderService;
 use App\Services\SettingsService;
 use App\Support\Money;
+use App\Support\OrganizationRole;
 use Database\Seeders\CatalogSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,13 +44,14 @@ class AdminPanelTest extends TestCase
 
     public function test_admin_can_open_every_page(): void
     {
-        $app = User::factory()->create()->apps()->create(['name' => 'App']);
+        $app = Organization::factory()->create()->apps()->create(['name' => 'App']);
         $provider = Provider::query()->firstOrFail();
 
         $this->actingAs($this->admin);
 
         foreach (['/admin', '/admin/providers', "/admin/providers/{$provider->id}/edit", '/admin/models', '/admin/packages',
-            '/admin/users', '/admin/apps', "/admin/apps/{$app->id}/edit", '/admin/orders', '/admin/usage', '/admin/billing-settings'] as $url) {
+            '/admin/users', '/admin/apps', "/admin/apps/{$app->id}/edit", '/admin/orders', '/admin/usage', '/admin/billing-settings',
+            '/admin/organizations', "/admin/organizations/{$app->organization_id}/edit"] as $url) {
             $this->get($url)->assertOk();
         }
     }
@@ -76,8 +81,8 @@ class AdminPanelTest extends TestCase
 
     public function test_admin_approves_a_pending_order(): void
     {
-        $user = User::factory()->create();
-        $app = $user->apps()->create(['name' => 'App']);
+        $user = User::factory()->inOrganization()->create();
+        $app = $user->currentOrganization->apps()->create(['name' => 'App']);
         $order = app(OrderService::class)->forCustomAmount($user, $app, Money::fromUsd('50'));
 
         $this->actingAs($this->admin);
@@ -93,7 +98,7 @@ class AdminPanelTest extends TestCase
 
     public function test_admin_adjusts_app_balance(): void
     {
-        $app = User::factory()->create()->apps()->create(['name' => 'App']);
+        $app = Organization::factory()->create()->apps()->create(['name' => 'App']);
 
         $this->actingAs($this->admin);
 
@@ -110,6 +115,26 @@ class AdminPanelTest extends TestCase
             ->assertHasNoFormErrors();
 
         $this->assertSame(500, $app->refresh()->markup_bps);
+    }
+
+    public function test_admin_manages_organization_members(): void
+    {
+        $organization = Organization::factory()->create();
+        $owner = User::factory()->inOrganization($organization)->create();
+        $newcomer = User::factory()->create();
+
+        $this->actingAs($this->admin);
+
+        Livewire::test(MembersRelationManager::class, ['ownerRecord' => $organization, 'pageClass' => EditOrganization::class])
+            ->assertCanSeeTableRecords([$owner])
+            ->assertTableColumnFormattedStateSet('pivot.role', 'مالک', $owner)
+            ->callAction(TestAction::make('attach')->table(), data: ['recordId' => $newcomer->id, 'role' => 'billing'])
+            ->assertHasNoFormErrors()
+            ->callAction(TestAction::make('edit')->table($newcomer), data: ['role' => 'developer'])
+            ->assertHasNoFormErrors();
+
+        $this->assertSame(OrganizationRole::Developer, $organization->roleOf($newcomer));
+        $this->assertSame(User::ROLE_CUSTOMER, $newcomer->refresh()->role);
     }
 
     public function test_billing_settings_are_saved(): void

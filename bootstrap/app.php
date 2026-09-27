@@ -3,6 +3,7 @@
 use App\Http\Middleware\AuthenticateAppKey;
 use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\ResolveOrganization;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => EnsureAdmin::class,
             'active' => EnsureActiveUser::class,
             'app.key' => AuthenticateAppKey::class,
+            'organization' => ResolveOrganization::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -8,6 +8,7 @@ use App\Models\App;
 use App\Models\AppApiKey;
 use App\Services\Gateway\GatewayError;
 use App\Services\SettingsService;
+use App\Support\OrganizationPermission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,6 +24,7 @@ class PlaygroundController extends Controller
     public function __invoke(Request $request, App $app, ChatCompletionsController $proxy, SettingsService $settings): Response
     {
         $this->ownedApp($request, $app);
+        $this->authorizeTo(OrganizationPermission::UseChat);
 
         $key = $app->apiKeys()->firstOrCreate(['name' => AppApiKey::PLAYGROUND_NAME], [
             'key_prefix' => 'panel',
@@ -33,8 +35,12 @@ class PlaygroundController extends Controller
             return GatewayError::response($request, 403, 'این اپ یا کلید چت پنل غیرفعال است.', 'permission_error');
         }
 
-        if ($app->balance <= $settings->get('min_balance') || $key->isOverSpendLimit()) {
+        if ($app->balance <= $settings->get('min_balance')) {
             return GatewayError::response($request, 402, 'موجودی اپ کافی نیست. لطفاً کیف پول را شارژ کنید.', 'billing_error');
+        }
+
+        if ($app->isOverSpendLimit() || $key->isOverSpendLimit()) {
+            return GatewayError::response($request, 402, "سقف هزینهٔ {$app->spend_limit_period->label()} این اپ پر شده است.", 'billing_error');
         }
 
         $request->attributes->set('app_key', $key->setRelation('app', $app));

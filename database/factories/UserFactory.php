@@ -2,7 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Models\Organization;
 use App\Models\User;
+use App\Support\OrganizationRole;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -43,6 +45,18 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    /**
+     * A member of `$organization` (a new one by default) with `$role`, working in it.
+     */
+    public function inOrganization(?Organization $organization = null, OrganizationRole $role = OrganizationRole::Owner): static
+    {
+        return $this->afterCreating(function (User $user) use ($organization, $role) {
+            $organization ??= Organization::factory()->create();
+            $organization->members()->attach($user->id, ['role' => $role->value]);
+            $user->forceFill(['current_organization_id' => $organization->id])->save();
+        });
     }
 
     public function admin(): static

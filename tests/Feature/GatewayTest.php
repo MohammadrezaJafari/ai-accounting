@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\AiModel;
 use App\Models\App;
+use App\Models\Organization;
 use App\Models\Provider;
 use App\Models\UsageLog;
-use App\Models\User;
 use App\Services\ApiKeyService;
 use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -45,7 +45,7 @@ class GatewayTest extends TestCase
             'cached_input_price' => Money::fromUsd('0.3'), 'cache_write_price' => Money::fromUsd('3.75'),
         ]);
 
-        $this->clientApp = User::factory()->create()->apps()->create(['name' => 'My app']);
+        $this->clientApp = Organization::factory()->create()->apps()->create(['name' => 'My app']);
         $this->clientApp->forceFill(['balance' => Money::fromUsd('10')])->save();
         [, $this->key] = app(ApiKeyService::class)->create($this->clientApp, ['name' => 'default']);
     }
@@ -171,7 +171,7 @@ class GatewayTest extends TestCase
     public function test_key_spend_limit(): void
     {
         [$key, $plain] = app(ApiKeyService::class)->create($this->clientApp, ['name' => 'limited', 'spend_limit' => Money::fromUsd('1')]);
-        $key->forceFill(['spent' => Money::fromUsd('1')])->save();
+        $key->forceFill(['spent' => Money::fromUsd('1'), 'period_spent' => Money::fromUsd('1')])->save();
 
         $this->withToken($plain)->getJson('/v1/models')->assertStatus(402);
     }
