@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AgentController;
+use App\Http\Controllers\Api\AgentDestinationController;
 use App\Http\Controllers\Api\AgentInstanceController;
 use App\Http\Controllers\Api\AppActivityController;
 use App\Http\Controllers\Api\AppApiKeyController;
@@ -69,6 +70,11 @@ Route::prefix('v1')->group(function () {
         Route::post('agent-instances/{agentInstance}/run', [AgentInstanceController::class, 'run'])->middleware('throttle:20,1');
         Route::get('agent-instances/{agentInstance}/runs', [AgentInstanceController::class, 'runs']);
         Route::get('agent-runs/{agentRun}', [AgentInstanceController::class, 'showRun']);
+        Route::get('agent-instances/{agentInstance}/destinations', [AgentDestinationController::class, 'index']);
+        Route::post('agent-instances/{agentInstance}/destinations', [AgentDestinationController::class, 'store']);
+        Route::patch('agent-destinations/{agentDestination}', [AgentDestinationController::class, 'update']);
+        Route::delete('agent-destinations/{agentDestination}', [AgentDestinationController::class, 'destroy']);
+        Route::post('agent-destinations/{agentDestination}/test', [AgentDestinationController::class, 'test'])->middleware('throttle:10,1');
 
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::post('notifications/read', [NotificationController::class, 'markAllRead']);

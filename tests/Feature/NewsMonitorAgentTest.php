@@ -194,6 +194,32 @@ class NewsMonitorAgentTest extends TestCase
         $this->assertSame(1, UsageLog::query()->count());
     }
 
+    public function test_excluded_keywords_old_news_and_report_style_are_applied(): void
+    {
+        $this->fakeSources();
+        $this->buyCredits();
+        $this->travelTo('2026-10-06 09:30:00');
+        $instance = $this->monitor([
+            'keywords' => ['بانک', 'پرداخت', 'فوتبال'],
+            'exclude_keywords' => ['مرکزی'],
+            'max_age_hours' => 12,
+            'detail' => 'detailed',
+            'language' => 'en',
+        ]);
+
+        $runner = app(AgentRunner::class);
+        $run = $runner->execute($runner->start($instance, AgentRun::TRIGGER_MANUAL));
+
+        // «بانک مرکزی» is excluded, «پرداخت» (09:00 yesterday) is older than 12 hours,
+        // and the undated football item passes the age filter.
+        $this->assertSame(1, $run->items_found);
+        Http::assertSent(fn (ClientRequest $request) => str_contains($this->prompt($request), 'فوتبال')
+            && ! str_contains($this->prompt($request), 'استارتاپ')
+            && ! str_contains($this->prompt($request), 'نرخ بهره')
+            && str_contains((string) data_get($request->data(), 'messages.0.content'), 'انگلیسی')
+            && str_contains((string) data_get($request->data(), 'messages.0.content'), 'پنج جمله'));
+    }
+
     public function test_news_pages_without_a_feed_are_read_for_headlines(): void
     {
         $this->fakeSources();

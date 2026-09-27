@@ -31,7 +31,10 @@ class AgentController extends Controller
             ->get()
             ->each(fn (Agent $agent) => $agent->setAttribute('credits', $credits[$agent->id] ?? 0));
 
-        return AgentResource::collection($agents);
+        return AgentResource::collection($agents)->additional(['delivery' => [
+            'telegram_bot' => config('services.telegram.bot_username'),
+            'bale_bot' => config('services.bale.bot_username'),
+        ]]);
     }
 
     /**

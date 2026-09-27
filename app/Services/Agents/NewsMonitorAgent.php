@@ -3,6 +3,7 @@
 namespace App\Services\Agents;
 
 use App\Models\AgentRun;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
@@ -11,7 +12,13 @@ use Illuminate\Support\Str;
  * are new since the last run and match the keywords, and writes a Persian report of them.
  * One report = one unit; a run without new items costs the customer nothing.
  *
- * Config: sources (URLs), keywords, instructions, max_items.
+ * Config:
+ * - sources: feed or news page URLs
+ * - keywords / exclude_keywords: keep items mentioning any keyword, drop those mentioning an excluded one
+ * - max_age_hours: ignore items published earlier than this (items without a date are kept)
+ * - max_items: news per report; detail: brief | detailed; language: fa | en
+ * - instructions: free-text guidance for the report
+ * - notify_empty: also tell the destinations when there was nothing new
  */
 class NewsMonitorAgent implements AgentHandler
 {
@@ -27,8 +34,14 @@ class NewsMonitorAgent implements AgentHandler
             'sources.*' => ['required', 'url:http,https', 'max:500'],
             'keywords' => ['nullable', 'array', 'max:20'],
             'keywords.*' => ['string', 'max:60'],
+            'exclude_keywords' => ['nullable', 'array', 'max:20'],
+            'exclude_keywords.*' => ['string', 'max:60'],
             'instructions' => ['nullable', 'string', 'max:1000'],
             'max_items' => ['nullable', 'integer', 'min:3', 'max:30'],
+            'max_age_hours' => ['nullable', 'integer', 'min:1', 'max:720'],
+            'detail' => ['nullable', 'in:brief,detailed'],
+            'language' => ['nullable', 'in:fa,en'],
+            'notify_empty' => ['nullable', 'boolean'],
         ];
     }
 
@@ -37,8 +50,13 @@ class NewsMonitorAgent implements AgentHandler
         return [
             'sources' => array_values(array_unique(array_map('trim', $config['sources'] ?? []))),
             'keywords' => array_values(array_filter(array_map('trim', $config['keywords'] ?? []))),
+            'exclude_keywords' => array_values(array_filter(array_map('trim', $config['exclude_keywords'] ?? []))),
             'instructions' => trim((string) ($config['instructions'] ?? '')) ?: null,
             'max_items' => (int) ($config['max_items'] ?? 12),
+            'max_age_hours' => (int) ($config['max_age_hours'] ?? 48),
+            'detail' => $config['detail'] ?? 'brief',
+            'language' => $config['language'] ?? 'fa',
+            'notify_empty' => (bool) ($config['notify_empty'] ?? false),
         ];
     }
 
@@ -55,7 +73,10 @@ class NewsMonitorAgent implements AgentHandler
         }
 
         $fresh = array_values(array_filter($items, fn (array $item) => ! isset($seen[$this->key($item)])));
-        $relevant = array_values(array_filter($fresh, fn (array $item) => $this->matches($item, $config['keywords'])));
+        $since = CarbonImmutable::now()->subHours($config['max_age_hours'])->toIso8601String();
+        $relevant = array_values(array_filter($fresh, fn (array $item) => ($item['published_at'] === null || $item['published_at'] >= $since)
+            && $this->matches($item, $config['keywords'])
+            && ! ($config['exclude_keywords'] !== [] && $this->matches($item, $config['exclude_keywords']))));
         usort($relevant, fn (array $a, array $b) => ($b['published_at'] ?? '') <=> ($a['published_at'] ?? ''));
         $selected = array_slice($relevant, 0, $config['max_items']);
 
@@ -73,7 +94,7 @@ class NewsMonitorAgent implements AgentHandler
         }
 
         $report = $llm->complete($run, [
-            ['role' => 'system', 'content' => $this->systemPrompt()],
+            ['role' => 'system', 'content' => $this->systemPrompt($config)],
             ['role' => 'user', 'content' => $this->userPrompt($config, $selected)],
         ]);
 
@@ -119,10 +140,22 @@ class NewsMonitorAgent implements AgentHandler
         return substr(sha1($item['link'] ?: $item['title']), 0, 16);
     }
 
-    private function systemPrompt(): string
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function systemPrompt(array $config): string
     {
-        return <<<'PROMPT'
-        تو تحلیلگر پایش خبر هستی. از روی فهرست خبرهایی که کاربر می‌دهد یک گزارش فارسی، کوتاه و دقیق با قالب Markdown بنویس.
+        $detail = $config['detail'] === 'detailed'
+            ? 'برای هر خبر سه تا پنج جمله بنویس و زمینه و پیامدهایش را هم توضیح بده.'
+            : 'برای هر خبر فقط یک یا دو جمله بنویس.';
+        $language = $config['language'] === 'en'
+            ? 'گزارش را به زبان انگلیسی بنویس (عنوان بخش‌ها: Summary و News).'
+            : 'گزارش را به زبان فارسی بنویس.';
+
+        return <<<PROMPT
+        تو تحلیلگر پایش خبر هستی. از روی فهرست خبرهایی که کاربر می‌دهد یک گزارش دقیق با قالب Markdown بنویس.
+        {$language}
+        {$detail}
 
         قواعد:
         - فقط از اطلاعات همین خبرها استفاده کن و چیزی از خودت اضافه نکن.
@@ -135,8 +168,8 @@ class NewsMonitorAgent implements AgentHandler
         دو تا چهار جمله دربارهٔ مهم‌ترین تحولات.
 
         ## خبرها
-        ### ۱. تیتر کوتاه فارسی
-        یک یا دو جمله خلاصه. **چرا مهم است:** یک جمله.
+        ### ۱. تیتر کوتاه
+        خلاصهٔ خبر. **چرا مهم است:** یک جمله.
         [منبع](لینک خبر)
         PROMPT;
     }

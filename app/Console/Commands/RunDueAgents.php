@@ -23,7 +23,7 @@ class RunDueAgents extends Command
             ->whereHas('agent', fn ($query) => $query->where('is_active', true))
             ->each(function (AgentInstance $instance) use ($runner) {
                 // Move the schedule first so a slow run is never picked up twice.
-                $instance->update(['next_run_at' => AgentSchedule::next($instance->run_hours ?? [])]);
+                $instance->update(['next_run_at' => AgentSchedule::next($instance->run_hours ?? [], $instance->run_days ?? [])]);
 
                 if ($instance->hasRunInProgress()) {
                     return;

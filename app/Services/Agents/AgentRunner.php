@@ -5,6 +5,7 @@ namespace App\Services\Agents;
 use App\Models\AgentInstance;
 use App\Models\AgentRun;
 use App\Notifications\AgentRunNotification;
+use App\Services\Agents\Delivery\ReportDelivery;
 use App\Support\OrganizationRole;
 use Illuminate\Support\Facades\Notification;
 use Throwable;
@@ -19,6 +20,7 @@ class AgentRunner
         private AgentRegistry $registry,
         private AgentCreditService $credits,
         private AgentLlm $llm,
+        private ReportDelivery $delivery,
     ) {}
 
     public function start(AgentInstance $instance, string $trigger): AgentRun
@@ -66,15 +68,32 @@ class AgentRunner
             $this->credits->release($run);
             $this->finish($run, AgentRun::STATUS_EMPTY, meta: $result->meta);
 
+            if ($run->instance->config['notify_empty'] ?? false) {
+                $this->deliver($run);
+            }
+
             return $run;
         }
 
         $this->credits->commit($run);
         $this->finish($run, AgentRun::STATUS_SUCCEEDED, $result->report, $result->itemsFound, $result->meta);
+        $this->deliver($run);
 
         rescue(fn () => Notification::send($run->organization->members()->get(), new AgentRunNotification($run)));
 
         return $run;
+    }
+
+    /**
+     * Send the report to the instance's destinations and keep the outcome with the run.
+     */
+    private function deliver(AgentRun $run): void
+    {
+        $deliveries = $this->delivery->deliver($run);
+
+        if ($deliveries !== []) {
+            $run->update(['meta' => [...($run->meta ?? []), 'deliveries' => $deliveries]]);
+        }
     }
 
     private function finish(AgentRun $run, string $status, ?string $report = null, int $items = 0, array $meta = [], ?string $error = null): void

@@ -28,6 +28,22 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    /*
+    | Messenger bots agents deliver reports with. Customers add the platform bot to their
+    | channel or group, or enter their own bot token. Bale's bot API mirrors Telegram's.
+    */
+    'telegram' => [
+        'api_url' => env('TELEGRAM_API_URL', 'https://api.telegram.org'),
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'bot_username' => env('TELEGRAM_BOT_USERNAME'),
+    ],
+
+    'bale' => [
+        'api_url' => env('BALE_API_URL', 'https://tapi.bale.ai'),
+        'bot_token' => env('BALE_BOT_TOKEN'),
+        'bot_username' => env('BALE_BOT_USERNAME'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

@@ -12,9 +12,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /**
  * An organization's configured agent (e.g. one news monitor with its sources and keywords).
  * Model calls are logged under `app_id`; `run_hours` are hours of the day (Tehran) to run at,
- * empty = manual runs only; `state` is the agent's memory between runs (e.g. news already seen).
+ * empty = manual runs only, on `run_days` (0 = Sunday … 6 = Saturday; empty = every day); `state` is the agent's memory between runs (e.g. news already seen).
  */
-#[Fillable(['organization_id', 'agent_id', 'app_id', 'name', 'config', 'run_hours', 'state', 'is_active', 'last_run_at', 'next_run_at', 'created_by'])]
+#[Fillable(['organization_id', 'agent_id', 'app_id', 'name', 'config', 'run_hours', 'run_days', 'state', 'is_active', 'last_run_at', 'next_run_at', 'created_by'])]
 class AgentInstance extends Model
 {
     protected $attributes = ['is_active' => true];
@@ -22,8 +22,8 @@ class AgentInstance extends Model
     protected static function booted(): void
     {
         static::saving(function (self $instance) {
-            if ($instance->isDirty(['run_hours', 'is_active']) || ! $instance->exists) {
-                $instance->next_run_at = $instance->is_active ? AgentSchedule::next($instance->run_hours ?? []) : null;
+            if ($instance->isDirty(['run_hours', 'run_days', 'is_active']) || ! $instance->exists) {
+                $instance->next_run_at = $instance->is_active ? AgentSchedule::next($instance->run_hours ?? [], $instance->run_days ?? []) : null;
             }
         });
     }
@@ -33,6 +33,7 @@ class AgentInstance extends Model
         return [
             'config' => 'array',
             'run_hours' => 'array',
+            'run_days' => 'array',
             'state' => 'array',
             'is_active' => 'boolean',
             'last_run_at' => 'datetime',
@@ -58,6 +59,11 @@ class AgentInstance extends Model
     public function runs(): HasMany
     {
         return $this->hasMany(AgentRun::class);
+    }
+
+    public function destinations(): HasMany
+    {
+        return $this->hasMany(AgentDestination::class);
     }
 
     public function latestRun(): HasOne

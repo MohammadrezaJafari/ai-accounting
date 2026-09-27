@@ -21,6 +21,8 @@ class AgentInstanceResource extends JsonResource
             'app' => $this->whenLoaded('app', fn () => ['id' => $this->app->id, 'name' => $this->app->name]),
             'config' => $this->config,
             'run_hours' => $this->run_hours ?? [],
+            'run_days' => $this->run_days ?? [],
+            'destinations' => AgentDestinationResource::collection($this->whenLoaded('destinations')),
             'is_active' => $this->is_active,
             'last_run_at' => $this->last_run_at,
             'next_run_at' => $this->next_run_at,

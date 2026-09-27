@@ -31,7 +31,7 @@ class AgentInstanceController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         return AgentInstanceResource::collection(
-            $this->organization($request)->agentInstances()->with(['agent', 'app', 'latestRun'])->latest('id')->get()
+            $this->organization($request)->agentInstances()->with(['agent', 'app', 'latestRun', 'destinations'])->latest('id')->get()
         );
     }
 
@@ -44,12 +44,12 @@ class AgentInstanceController extends Controller
             $this->validated($request, $agent, true) + ['agent_id' => $agent->id, 'created_by' => $request->user()->id]
         );
 
-        return new AgentInstanceResource($instance->load(['agent', 'app', 'latestRun']));
+        return new AgentInstanceResource($instance->load(['agent', 'app', 'latestRun', 'destinations']));
     }
 
     public function show(Request $request, AgentInstance $agentInstance): AgentInstanceResource
     {
-        return new AgentInstanceResource($this->owned($request, $agentInstance)->load(['agent', 'app', 'latestRun']));
+        return new AgentInstanceResource($this->owned($request, $agentInstance)->load(['agent', 'app', 'latestRun', 'destinations']));
     }
 
     public function update(Request $request, AgentInstance $agentInstance): AgentInstanceResource
@@ -59,7 +59,7 @@ class AgentInstanceController extends Controller
 
         $instance->update($this->validated($request, $instance->agent, false));
 
-        return new AgentInstanceResource($instance->load(['agent', 'app', 'latestRun']));
+        return new AgentInstanceResource($instance->load(['agent', 'app', 'latestRun', 'destinations']));
     }
 
     public function destroy(Request $request, AgentInstance $agentInstance): JsonResponse
@@ -123,6 +123,8 @@ class AgentInstanceController extends Controller
             'app_id' => [$required, 'integer', Rule::exists('apps', 'id')->where('organization_id', $this->organization($request)->id)],
             'run_hours' => ['sometimes', 'array', 'max:6'],
             'run_hours.*' => ['integer', 'distinct', 'between:0,23'],
+            'run_days' => ['sometimes', 'array', 'max:7'],
+            'run_days.*' => ['integer', 'distinct', 'between:0,6'],
             'is_active' => ['sometimes', 'boolean'],
             'config' => [$required, 'array'],
             ...($creating || $request->has('config') ? $configRules : []),
@@ -132,8 +134,10 @@ class AgentInstanceController extends Controller
             $data['config'] = $handler->normalize($data['config']);
         }
 
-        if (array_key_exists('run_hours', $data)) {
-            $data['run_hours'] = array_values(array_map('intval', $data['run_hours']));
+        foreach (['run_hours', 'run_days'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $data[$field] = array_values(array_map('intval', $data[$field]));
+            }
         }
 
         return $data;
