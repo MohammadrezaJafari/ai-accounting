@@ -6,6 +6,7 @@ use App\Models\AgentRun;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use NumberFormatter;
 
 /**
  * A new agent report is ready, or a run was skipped because the organization has no units left.
@@ -61,7 +62,7 @@ class AgentRunNotification extends Notification
     private function message(): string
     {
         return $this->isReport()
-            ? "{$this->run->items_found} خبر تازه بررسی و خلاصه شد."
+            ? (new NumberFormatter('fa_IR', NumberFormatter::DECIMAL))->format($this->run->items_found).' خبر تازه بررسی و خلاصه شد.'
             : "برای ادامهٔ پایش، یک بسته «{$this->run->agent->unit_name}» بخرید.";
     }
 
