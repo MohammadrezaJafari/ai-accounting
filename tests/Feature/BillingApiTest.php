@@ -23,14 +23,14 @@ class BillingApiTest extends TestCase
 
     public function test_register_create_app_and_key(): void
     {
-        $token = $this->postJson('/api/auth/register', [
+        $token = $this->postJson('/api/v1/auth/register', [
             'name' => 'Ali', 'email' => 'ali@example.com', 'password' => 'secret123', 'password_confirmation' => 'secret123',
         ])->assertCreated()->json('token');
 
-        $appId = $this->withToken($token)->postJson('/api/apps', ['name' => 'Chatbot'])->assertCreated()->json('data.id');
+        $appId = $this->withToken($token)->postJson('/api/v1/apps', ['name' => 'Chatbot'])->assertCreated()->json('data.id');
 
         $response = $this->withToken($token)
-            ->postJson("/api/apps/{$appId}/keys", ['name' => 'prod', 'allowed_providers' => ['anthropic']])
+            ->postJson("/api/v1/apps/{$appId}/keys", ['name' => 'prod', 'allowed_providers' => ['anthropic']])
             ->assertCreated();
 
         $this->assertStringStartsWith('sk-aia-', $response->json('plain_key'));
@@ -44,7 +44,7 @@ class BillingApiTest extends TestCase
         $package = Package::query()->where('name', 'Business')->sole();
 
         Sanctum::actingAs($user);
-        $this->postJson('/api/orders', ['app_id' => $app->id, 'package_id' => $package->id])
+        $this->postJson('/api/v1/orders', ['app_id' => $app->id, 'package_id' => $package->id])
             ->assertCreated()
             ->assertJsonPath('data.status', 'pending')
             ->assertJsonPath('data.amount', '100.00')
@@ -60,8 +60,8 @@ class BillingApiTest extends TestCase
         $app = $user->apps()->create(['name' => 'App']);
         Sanctum::actingAs($user);
 
-        $this->postJson('/api/orders', ['app_id' => $app->id, 'amount' => 1])->assertUnprocessable();
-        $this->postJson('/api/orders', ['app_id' => $app->id, 'amount' => '37.5'])->assertCreated()->assertJsonPath('data.status', 'paid');
+        $this->postJson('/api/v1/orders', ['app_id' => $app->id, 'amount' => 1])->assertUnprocessable();
+        $this->postJson('/api/v1/orders', ['app_id' => $app->id, 'amount' => '37.5'])->assertCreated()->assertJsonPath('data.status', 'paid');
 
         $this->assertSame('37.50', Money::toUsd($app->refresh()->balance));
         $this->assertSame(Order::TYPE_CUSTOM, Order::query()->sole()->type);
@@ -72,15 +72,15 @@ class BillingApiTest extends TestCase
         $other = User::factory()->create()->apps()->create(['name' => 'Theirs']);
         Sanctum::actingAs(User::factory()->create());
 
-        $this->getJson("/api/apps/{$other->id}")->assertNotFound();
-        $this->postJson('/api/orders', ['app_id' => $other->id, 'amount' => 10])->assertNotFound();
+        $this->getJson("/api/v1/apps/{$other->id}")->assertNotFound();
+        $this->postJson('/api/v1/orders', ['app_id' => $other->id, 'amount' => 10])->assertNotFound();
     }
 
     public function test_customer_catalog_hides_cost(): void
     {
         Sanctum::actingAs(User::factory()->create());
 
-        $model = $this->getJson('/api/catalog/models')->assertOk()->json('data.0');
+        $model = $this->getJson('/api/v1/catalog/models')->assertOk()->json('data.0');
         $this->assertArrayHasKey('price', $model);
         $this->assertArrayNotHasKey('cost', $model);
         $this->assertArrayNotHasKey('upstream_id', $model);

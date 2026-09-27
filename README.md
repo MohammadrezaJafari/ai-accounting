@@ -13,7 +13,7 @@
 | بخش | فناوری | مسیر |
 |---|---|---|
 | پنل مدیریت | Filament 5 (فارسی، وزیرمتن، تاریخ جلالی، ساعت تهران) | `/admin` |
-| API پنل مشتری | Laravel + Sanctum، مصرف‌کننده: [ai-accounting-web-app](https://github.com/MohammadrezaJafari/ai-accounting-web-app) (Quasar) | `/api` |
+| API پنل مشتری | Laravel + Sanctum، مصرف‌کننده: [ai-accounting-web-app](https://github.com/MohammadrezaJafari/ai-accounting-web-app) (Quasar) | `/api/v1` |
 | Gateway مدل‌ها | سازگار با OpenAI و Anthropic | `/v1` |
 
 ## قیمت‌گذاری
@@ -55,7 +55,7 @@ client.messages.create(model="claude-sonnet-4-5", max_tokens=1024, messages=[{"r
 - در حالت stream، گزینهٔ `stream_options.include_usage` خودکار فعال می‌شود تا مصرف قابل محاسبه باشد.
 - اگر ارائه‌دهنده گزارش مصرف نفرستد (مثلاً چون کلاینت وسط کار قطع شده)، مصرف تخمین زده می‌شود (حدود ۴ کاراکتر برای هر توکن) و در لاگ علامت می‌خورد.
 
-## API پنل مشتری (`/api`)
+## API پنل مشتری (`/api/v1`)
 
 | متد | مسیر | توضیح |
 |---|---|---|
