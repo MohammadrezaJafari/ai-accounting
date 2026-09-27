@@ -5,25 +5,11 @@ namespace App\Services\Agents;
 use App\Models\AgentRun;
 
 /**
- * The implementation behind an agent product.
+ * Does the work of an agent run: an HTTP service (HttpAgent) or a built-in implementation.
+ * The customer's parameters are defined by the agent's `config_schema`, not by the handler.
  */
 interface AgentHandler
 {
-    /**
-     * Validation rules for an instance's `config` (keys are relative to `config.`).
-     *
-     * @return array<string, mixed>
-     */
-    public function rules(): array;
-
-    /**
-     * Normalised config with defaults filled in.
-     *
-     * @param  array<string, mixed>  $config
-     * @return array<string, mixed>
-     */
-    public function normalize(array $config): array;
-
     /**
      * Do the work once. Model calls go through `$llm` so they are costed against the run.
      */

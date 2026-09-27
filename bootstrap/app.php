@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AuthenticateAgentRun;
 use App\Http\Middleware\AuthenticateAppKey;
 use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureAdmin;
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
         then: function () {
             Route::prefix('v1')->group(base_path('routes/gateway.php'));
+            Route::prefix('agent-api')->group(base_path('routes/agent.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -25,11 +27,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => EnsureAdmin::class,
             'active' => EnsureActiveUser::class,
             'app.key' => AuthenticateAppKey::class,
+            'agent.run' => AuthenticateAgentRun::class,
             'organization' => ResolveOrganization::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*', 'v1/*') || $request->expectsJson(),
+            fn (Request $request) => $request->is('api/*', 'v1/*', 'agent-api/*') || $request->expectsJson(),
         );
     })->create();

@@ -153,11 +153,11 @@ class AgentDeliveryTest extends TestCase
         $this->runMonitor();
         Http::assertNotSent(fn (ClientRequest $request) => str_contains($request->url(), 'tg.test'));
 
-        $this->monitor->update(['config' => [...$this->monitor->config, 'notify_empty' => true]]);
+        $this->monitor->update(['notify_empty' => true]);
         $run = $this->runMonitor();
 
         $this->assertSame(AgentRun::STATUS_EMPTY, $run->status);
-        Http::assertSent(fn (ClientRequest $request) => str_contains($request->url(), 'tg.test') && str_contains($request['text'], 'خبر تازه‌ای پیدا نشد'));
+        Http::assertSent(fn (ClientRequest $request) => str_contains($request->url(), 'tg.test') && str_contains($request['text'], 'مورد تازه‌ای پیدا نشد'));
     }
 
     public function test_destinations_are_managed_and_tested_through_the_api(): void

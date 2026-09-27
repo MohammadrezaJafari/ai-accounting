@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Agent units of an organization: bought in packages with an app wallet, used one by one by runs.
+ * Agent units of an organization: bought in packages with an app wallet and used by runs
+ * (one held at the start, more if the agent reports its output is worth more).
  */
 class AgentCreditService
 {
@@ -72,7 +73,7 @@ class AgentCreditService
                 return false;
             }
 
-            $value = $credit->unitValue();
+            $value = $credit->units === 1 ? $credit->value : $credit->unitValue();
             $credit->units--;
             $credit->value -= $value;
             $credit->save();
@@ -103,20 +104,36 @@ class AgentCreditService
     }
 
     /**
-     * Record the held unit as used by a run that delivered.
+     * Record the units a run's output is worth as used: the held unit plus, when the agent
+     * reports more, as many extra as the organization still has.
      */
-    public function commit(AgentRun $run): void
+    public function commit(AgentRun $run, int $units = 1): void
     {
-        AgentCreditTransaction::query()->create([
-            'organization_id' => $run->organization_id,
-            'agent_id' => $run->agent_id,
-            'app_id' => $run->instance->app_id,
-            'agent_run_id' => $run->id,
-            'type' => AgentCreditTransaction::TYPE_USAGE,
-            'units' => -$run->units,
-            'value' => -$run->revenue,
-            'description' => "«{$run->instance->name}»",
-        ]);
+        DB::transaction(function () use ($run, $units) {
+            $extra = max(0, $units - $run->units);
+
+            if ($extra > 0) {
+                $credit = $this->locked($run->organization, $run->agent);
+                $extra = min($extra, max(0, $credit->units));
+                $value = $extra === $credit->units ? $credit->value : $extra * $credit->unitValue();
+                $credit->units -= $extra;
+                $credit->value -= $value;
+                $credit->save();
+
+                $run->forceFill(['units' => $run->units + $extra, 'revenue' => $run->revenue + $value])->save();
+            }
+
+            AgentCreditTransaction::query()->create([
+                'organization_id' => $run->organization_id,
+                'agent_id' => $run->agent_id,
+                'app_id' => $run->instance->app_id,
+                'agent_run_id' => $run->id,
+                'type' => AgentCreditTransaction::TYPE_USAGE,
+                'units' => -$run->units,
+                'value' => -$run->revenue,
+                'description' => "«{$run->instance->name}»",
+            ]);
+        });
     }
 
     private function locked(Organization $organization, Agent $agent): AgentCredit

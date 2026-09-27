@@ -24,8 +24,8 @@ class RunsRelationManager extends RelationManager
     public const STATUSES = [
         AgentRun::STATUS_QUEUED => 'در صف',
         AgentRun::STATUS_RUNNING => 'در حال اجرا',
-        AgentRun::STATUS_SUCCEEDED => 'گزارش داد',
-        AgentRun::STATUS_EMPTY => 'خبر تازه نبود',
+        AgentRun::STATUS_SUCCEEDED => 'تحویل داد',
+        AgentRun::STATUS_EMPTY => 'چیز تازه‌ای نبود',
         AgentRun::STATUS_NO_CREDITS => 'بدون اعتبار',
         AgentRun::STATUS_FAILED => 'ناموفق',
     ];
@@ -47,7 +47,8 @@ class RunsRelationManager extends RelationManager
                         default => 'gray',
                     })
                     ->tooltip(fn (AgentRun $record) => $record->error),
-                TextColumn::make('items_found')->label('خبر'),
+                TextColumn::make('units')->label('واحد'),
+                TextColumn::make('items_found')->label('مورد'),
                 TextColumn::make('revenue')->label('درآمد')->formatStateUsing(fn ($state) => Money::format((int) $state))->extraAttributes(['dir' => 'ltr']),
                 TextColumn::make('cost')->label('هزینه')->formatStateUsing(fn ($state) => Money::format((int) $state))->extraAttributes(['dir' => 'ltr']),
                 TextColumn::make('margin')->label('سود')->state(fn (AgentRun $record) => Money::format($record->margin()))

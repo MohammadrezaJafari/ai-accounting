@@ -3,13 +3,15 @@
 namespace App\Http\Resources;
 
 use App\Models\AgentPackage;
+use App\Services\Agents\ConfigSchema;
 use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * An agent product with its packages and the current organization's remaining units
- * (`credits`, set by the controller).
+ * A marketplace listing with its packages, the parameters customers fill in and the current
+ * organization's remaining units (`credits`, set by the controller). How the agent is
+ * hosted and what it costs us stay private.
  */
 class AgentResource extends JsonResource
 {
@@ -19,8 +21,14 @@ class AgentResource extends JsonResource
             'id' => $this->id,
             'slug' => $this->slug,
             'name' => $this->name,
+            'tagline' => $this->tagline,
             'description' => $this->description,
+            'icon' => $this->icon ?: 'smart_toy',
+            'category' => $this->category,
+            'publisher' => $this->publisher_name ? ['name' => $this->publisher_name, 'url' => $this->publisher_url] : null,
             'unit_name' => $this->unit_name,
+            'max_units_per_run' => $this->max_units_per_run,
+            'config_schema' => ConfigSchema::for($this->resource)->fields(),
             'credits' => (int) ($this->credits ?? 0),
             'packages' => $this->whenLoaded('packages', fn () => $this->packages->map(fn (AgentPackage $package) => [
                 'id' => $package->id,

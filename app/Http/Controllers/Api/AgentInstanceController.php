@@ -9,8 +9,8 @@ use App\Jobs\RunAgent;
 use App\Models\Agent;
 use App\Models\AgentInstance;
 use App\Models\AgentRun;
-use App\Services\Agents\AgentRegistry;
 use App\Services\Agents\AgentRunner;
+use App\Services\Agents\ConfigSchema;
 use App\Support\OrganizationPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,14 +19,13 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
- * The organization's configured agents (e.g. news monitors), their runs and reports.
+ * The organization's configured agents, their runs and reports. Parameters are checked
+ * against the agent's config schema.
  * Every member can read reports; configuring and running needs the apps permission.
  */
 class AgentInstanceController extends Controller
 {
     use Concerns;
-
-    public function __construct(private AgentRegistry $registry) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -41,7 +40,7 @@ class AgentInstanceController extends Controller
         $agent = Agent::query()->active()->findOrFail($request->integer('agent_id'));
 
         $instance = $this->organization($request)->agentInstances()->create(
-            $this->validated($request, $agent, true) + ['agent_id' => $agent->id, 'created_by' => $request->user()->id]
+            $this->validated($request, $agent) + ['agent_id' => $agent->id, 'created_by' => $request->user()->id]
         );
 
         return new AgentInstanceResource($instance->load(['agent', 'app', 'latestRun', 'destinations']));
@@ -57,7 +56,7 @@ class AgentInstanceController extends Controller
         $this->authorizeTo(OrganizationPermission::ManageApps);
         $instance = $this->owned($request, $agentInstance);
 
-        $instance->update($this->validated($request, $instance->agent, false));
+        $instance->update($this->validated($request, $instance->agent, $instance));
 
         return new AgentInstanceResource($instance->load(['agent', 'app', 'latestRun', 'destinations']));
     }
@@ -112,11 +111,11 @@ class AgentInstanceController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function validated(Request $request, Agent $agent, bool $creating): array
+    private function validated(Request $request, Agent $agent, ?AgentInstance $instance = null): array
     {
-        $required = $creating ? 'required' : 'sometimes';
-        $handler = $this->registry->handler($agent);
-        $configRules = collect($handler->rules())->mapWithKeys(fn ($rules, $key) => ["config.{$key}" => $rules])->all();
+        $required = $instance ? 'sometimes' : 'required';
+        $schema = ConfigSchema::for($agent);
+        $previous = $instance->config ?? [];
 
         $data = $request->validate([
             'name' => [$required, 'string', 'max:100'],
@@ -125,13 +124,13 @@ class AgentInstanceController extends Controller
             'run_hours.*' => ['integer', 'distinct', 'between:0,23'],
             'run_days' => ['sometimes', 'array', 'max:7'],
             'run_days.*' => ['integer', 'distinct', 'between:0,6'],
+            'notify_empty' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
-            'config' => [$required, 'array'],
-            ...($creating || $request->has('config') ? $configRules : []),
+            ...(! $instance || $request->has('config') ? $schema->rules($previous) : []),
         ]);
 
-        if (array_key_exists('config', $data)) {
-            $data['config'] = $handler->normalize($data['config']);
+        if (! $instance || $request->has('config')) {
+            $data['config'] = $schema->normalize($data['config'] ?? [], $previous);
         }
 
         foreach (['run_hours', 'run_days'] as $field) {

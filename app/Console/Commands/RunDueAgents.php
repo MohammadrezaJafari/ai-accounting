@@ -11,11 +11,15 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
 #[Signature('agents:run-due')]
-#[Description('Run the agent instances whose scheduled hour has come')]
+#[Description('Run the agent instances whose scheduled hour has come and fail runs past their deadline')]
 class RunDueAgents extends Command
 {
     public function handle(AgentRunner $runner): int
     {
+        if ($expired = $runner->expireOverdue()) {
+            $this->line("{$expired} overdue run(s) failed");
+        }
+
         AgentInstance::query()
             ->where('is_active', true)
             ->whereNotNull('next_run_at')

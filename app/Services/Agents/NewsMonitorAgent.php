@@ -6,6 +6,7 @@ use App\Models\AgentRun;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use NumberFormatter;
 
 /**
  * News monitoring: reads the configured sources (feeds or news pages), keeps the items that
@@ -18,7 +19,6 @@ use Illuminate\Support\Str;
  * - max_age_hours: ignore items published earlier than this (items without a date are kept)
  * - max_items: news per report; detail: brief | detailed; language: fa | en
  * - instructions: free-text guidance for the report
- * - notify_empty: also tell the destinations when there was nothing new
  */
 class NewsMonitorAgent implements AgentHandler
 {
@@ -27,43 +27,51 @@ class NewsMonitorAgent implements AgentHandler
 
     public function __construct(private FeedFetcher $fetcher) {}
 
-    public function rules(): array
-    {
-        return [
-            'sources' => ['required', 'array', 'min:1', 'max:10'],
-            'sources.*' => ['required', 'url:http,https', 'max:500'],
-            'keywords' => ['nullable', 'array', 'max:20'],
-            'keywords.*' => ['string', 'max:60'],
-            'exclude_keywords' => ['nullable', 'array', 'max:20'],
-            'exclude_keywords.*' => ['string', 'max:60'],
-            'instructions' => ['nullable', 'string', 'max:1000'],
-            'max_items' => ['nullable', 'integer', 'min:3', 'max:30'],
-            'max_age_hours' => ['nullable', 'integer', 'min:1', 'max:720'],
-            'detail' => ['nullable', 'in:brief,detailed'],
-            'language' => ['nullable', 'in:fa,en'],
-            'notify_empty' => ['nullable', 'boolean'],
-        ];
-    }
+    /**
+     * Parameters customers fill in; stored on the agent so the admin can adjust labels and limits.
+     */
+    public const CONFIG_SCHEMA = [
+        ['key' => 'sources', 'label' => 'منابع خبری', 'type' => 'url_list', 'required' => true, 'section' => 'منابع',
+            'hint' => 'فید RSS/Atom یا صفحهٔ اول سایت خبری، هر خط یک آدرس؛ تا ۱۰ منبع.', 'max_items' => 10],
+        ['key' => 'keywords', 'label' => 'کلیدواژه‌ها', 'type' => 'tags', 'section' => 'فیلتر خبرها', 'hint' => 'خالی = همهٔ خبرها', 'max_items' => 20],
+        ['key' => 'exclude_keywords', 'label' => 'کلیدواژه‌های حذفی', 'type' => 'tags', 'section' => 'فیلتر خبرها', 'hint' => 'خبرهای شامل این‌ها کنار گذاشته می‌شوند', 'max_items' => 20],
+        ['key' => 'max_age_hours', 'label' => 'تازگی خبر', 'type' => 'select', 'section' => 'فیلتر خبرها', 'default' => '48', 'options' => [
+            ['value' => '6', 'label' => '۶ ساعت اخیر'], ['value' => '12', 'label' => '۱۲ ساعت اخیر'], ['value' => '24', 'label' => '۱ روز اخیر'],
+            ['value' => '48', 'label' => '۲ روز اخیر'], ['value' => '72', 'label' => '۳ روز اخیر'], ['value' => '168', 'label' => '۷ روز اخیر'],
+        ]],
+        ['key' => 'max_items', 'label' => 'حداکثر خبر در هر گزارش', 'type' => 'number', 'section' => 'فیلتر خبرها', 'default' => 12, 'min' => 3, 'max' => 30],
+        ['key' => 'detail', 'label' => 'جزئیات', 'type' => 'select', 'section' => 'گزارش', 'default' => 'brief', 'options' => [
+            ['value' => 'brief', 'label' => 'خلاصه'], ['value' => 'detailed', 'label' => 'مفصل'],
+        ]],
+        ['key' => 'language', 'label' => 'زبان گزارش', 'type' => 'select', 'section' => 'گزارش', 'default' => 'fa', 'options' => [
+            ['value' => 'fa', 'label' => 'فارسی'], ['value' => 'en', 'label' => 'English'],
+        ]],
+        ['key' => 'instructions', 'label' => 'دستورالعمل (اختیاری)', 'type' => 'textarea', 'section' => 'گزارش', 'max' => 1000,
+            'placeholder' => 'مثلاً: روی اثر خبرها بر بازار پرداخت تمرکز کن و اعداد را پررنگ کن.'],
+    ];
 
-    public function normalize(array $config): array
+    /**
+     * @param  array<string, mixed>  $config
+     * @return array{sources: list<string>, keywords: list<string>, exclude_keywords: list<string>, instructions: ?string, max_items: int, max_age_hours: int, detail: string, language: string}
+     */
+    private function settings(array $config): array
     {
         return [
             'sources' => array_values(array_unique(array_map('trim', $config['sources'] ?? []))),
             'keywords' => array_values(array_filter(array_map('trim', $config['keywords'] ?? []))),
             'exclude_keywords' => array_values(array_filter(array_map('trim', $config['exclude_keywords'] ?? []))),
             'instructions' => trim((string) ($config['instructions'] ?? '')) ?: null,
-            'max_items' => (int) ($config['max_items'] ?? 12),
-            'max_age_hours' => (int) ($config['max_age_hours'] ?? 48),
+            'max_items' => max(1, (int) ($config['max_items'] ?? 12)),
+            'max_age_hours' => max(1, (int) ($config['max_age_hours'] ?? 48)),
             'detail' => $config['detail'] ?? 'brief',
             'language' => $config['language'] ?? 'fa',
-            'notify_empty' => (bool) ($config['notify_empty'] ?? false),
         ];
     }
 
     public function run(AgentRun $run, AgentLlm $llm): AgentResult
     {
         $instance = $run->instance;
-        $config = $this->normalize($instance->config);
+        $config = $this->settings($instance->config ?? []);
         $seen = array_flip($instance->state['seen'] ?? []);
 
         [$items, $errors] = $this->collect($config['sources']);
@@ -82,10 +90,8 @@ class NewsMonitorAgent implements AgentHandler
 
         $state = ['seen' => array_slice([...array_keys($seen), ...array_map($this->key(...), $fresh)], -self::SEEN_LIMIT)];
         $meta = [
-            'sources' => count($config['sources']),
-            'fetched' => count($items),
-            'new' => count($fresh),
-            'matched' => count($relevant),
+            'notes' => [sprintf('%s خبر از %s منبع خوانده شد، %s تازه و %s مرتبط.',
+                self::digits(count($items)), self::digits(count($config['sources'])), self::digits(count($fresh)), self::digits(count($relevant)))],
             'errors' => $errors,
         ];
 
@@ -99,6 +105,11 @@ class NewsMonitorAgent implements AgentHandler
         ]);
 
         return new AgentResult(trim($report), count($selected), $meta, $state);
+    }
+
+    private static function digits(int $number): string
+    {
+        return (new NumberFormatter('fa_IR', NumberFormatter::DECIMAL))->format($number);
     }
 
     /**

@@ -61,9 +61,13 @@ class AgentRunNotification extends Notification
 
     private function message(): string
     {
-        return $this->isReport()
-            ? (new NumberFormatter('fa_IR', NumberFormatter::DECIMAL))->format($this->run->items_found).' خبر تازه بررسی و خلاصه شد.'
-            : "برای ادامهٔ پایش، یک بسته «{$this->run->agent->unit_name}» بخرید.";
+        if (! $this->isReport()) {
+            return "برای ادامهٔ کار ایجنت، یک بسته «{$this->run->agent->unit_name}» بخرید.";
+        }
+
+        return $this->run->items_found > 0
+            ? (new NumberFormatter('fa_IR', NumberFormatter::DECIMAL))->format($this->run->items_found)." مورد تازه در {$this->run->agent->name} بررسی شد."
+            : "{$this->run->agent->name} خروجی تازه‌ای آماده کرد.";
     }
 
     private function url(): string

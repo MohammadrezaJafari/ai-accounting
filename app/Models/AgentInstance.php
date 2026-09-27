@@ -13,11 +13,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * An organization's configured agent (e.g. one news monitor with its sources and keywords).
  * Model calls are logged under `app_id`; `run_hours` are hours of the day (Tehran) to run at,
  * empty = manual runs only, on `run_days` (0 = Sunday … 6 = Saturday; empty = every day); `state` is the agent's memory between runs (e.g. news already seen).
+ * `notify_empty` also tells the destinations when a run found nothing new.
  */
-#[Fillable(['organization_id', 'agent_id', 'app_id', 'name', 'config', 'run_hours', 'run_days', 'state', 'is_active', 'last_run_at', 'next_run_at', 'created_by'])]
+#[Fillable(['organization_id', 'agent_id', 'app_id', 'name', 'config', 'run_hours', 'run_days', 'notify_empty', 'state', 'is_active', 'last_run_at', 'next_run_at', 'created_by'])]
 class AgentInstance extends Model
 {
-    protected $attributes = ['is_active' => true];
+    protected $attributes = ['is_active' => true, 'notify_empty' => false];
 
     protected static function booted(): void
     {
@@ -35,6 +36,7 @@ class AgentInstance extends Model
             'run_hours' => 'array',
             'run_days' => 'array',
             'state' => 'array',
+            'notify_empty' => 'boolean',
             'is_active' => 'boolean',
             'last_run_at' => 'datetime',
             'next_run_at' => 'datetime',
@@ -75,7 +77,8 @@ class AgentInstance extends Model
     {
         return $this->runs()
             ->whereIn('status', [AgentRun::STATUS_QUEUED, AgentRun::STATUS_RUNNING])
-            ->where('created_at', '>=', now()->subMinutes(15))
+            ->where(fn ($query) => $query->where('deadline_at', '>=', now())
+                ->orWhere(fn ($query) => $query->whereNull('deadline_at')->where('created_at', '>=', now()->subMinutes(15))))
             ->exists();
     }
 }

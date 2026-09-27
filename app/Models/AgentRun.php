@@ -3,15 +3,20 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 /**
  * One execution of an agent instance. `revenue` is the paid value of the units it used and
  * `cost` what its model calls cost us (both nano-USD); the difference is the margin.
+ * An HTTP agent gets a token for the run (stored hashed) to call our models and post its
+ * result until `deadline_at`; `data` is the structured output it returned, if any.
  */
-#[Fillable(['agent_instance_id', 'agent_id', 'organization_id', 'status', 'trigger', 'units', 'revenue', 'cost', 'items_found', 'report', 'error', 'meta', 'started_at', 'finished_at'])]
+#[Fillable(['agent_instance_id', 'agent_id', 'organization_id', 'status', 'trigger', 'units', 'revenue', 'cost', 'items_found', 'report', 'data', 'error', 'meta', 'started_at', 'deadline_at', 'finished_at'])]
+#[Hidden(['token_hash'])]
 class AgentRun extends Model
 {
     public const STATUS_QUEUED = 'queued';
@@ -41,7 +46,9 @@ class AgentRun extends Model
             'cost' => 'integer',
             'items_found' => 'integer',
             'meta' => 'array',
+            'data' => 'array',
             'started_at' => 'datetime',
+            'deadline_at' => 'datetime',
             'finished_at' => 'datetime',
         ];
     }
@@ -64,6 +71,29 @@ class AgentRun extends Model
     public function usageLogs(): HasMany
     {
         return $this->hasMany(UsageLog::class);
+    }
+
+    /**
+     * A new token for the agent to act on this run until the deadline; only its hash is kept.
+     */
+    public function issueToken(int $minutes): string
+    {
+        $token = 'agr_'.Str::random(48);
+        $this->forceFill(['token_hash' => hash('sha256', $token), 'deadline_at' => now()->addMinutes($minutes)])->save();
+
+        return $token;
+    }
+
+    /**
+     * The running run a token belongs to, while it is still valid.
+     */
+    public static function findByToken(string $token): ?self
+    {
+        return self::query()
+            ->where('token_hash', hash('sha256', $token))
+            ->where('status', self::STATUS_RUNNING)
+            ->where('deadline_at', '>', now())
+            ->first();
     }
 
     public function margin(): int

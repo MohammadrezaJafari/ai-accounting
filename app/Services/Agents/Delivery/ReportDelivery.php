@@ -34,7 +34,7 @@ class ReportDelivery
         return $destinations->map(fn (AgentDestination $destination) => $this->attempt($destination, fn () => $this->send(
             $destination,
             $this->title($run),
-            $run->report ?? 'در این نوبت خبر تازه‌ای پیدا نشد.',
+            $run->report ?? 'در این نوبت مورد تازه‌ای پیدا نشد.',
             $this->payload($run),
         )))->all();
     }
@@ -178,6 +178,8 @@ class ReportDelivery
             'name' => $run->instance->name,
             'run_id' => $run->id,
             'items_found' => $run->items_found,
+            'units' => $run->units,
+            'data' => (object) ($run->data ?? []),
             'created_at' => $run->created_at->toIso8601String(),
         ];
     }

@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\BillingSettings;
+use App\Filament\Resources\Agents\Pages\CreateAgent;
+use App\Filament\Resources\Agents\Pages\EditAgent;
 use App\Filament\Resources\AiModels\Pages\CreateAiModel;
 use App\Filament\Resources\Apps\Pages\EditApp;
 use App\Filament\Resources\Apps\Pages\ListApps;
@@ -17,12 +19,15 @@ use App\Models\Provider;
 use App\Models\User;
 use App\Services\OrderService;
 use App\Services\SettingsService;
+use App\Support\AgentDriver;
 use App\Support\Money;
 use App\Support\OrganizationRole;
 use Database\Seeders\AgentSeeder;
 use Database\Seeders\CatalogSeeder;
 use Filament\Actions\Testing\TestAction;
+use Filament\Forms\Components\Repeater;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -58,6 +63,62 @@ class AdminPanelTest extends TestCase
             '/admin/organizations', "/admin/organizations/{$app->organization_id}/edit", '/admin/agents', "/admin/agents/{$agent->id}/edit"] as $url) {
             $this->get($url)->assertOk();
         }
+    }
+
+    public function test_admin_lists_an_external_agent_with_its_parameters(): void
+    {
+        $this->actingAs($this->admin);
+        $undoRepeaterFake = Repeater::fake();
+        $base = [
+            'name' => 'پایش رقبا', 'slug' => 'competitor-watch', 'driver' => 'http', 'endpoint_url' => 'https://agent.test/run',
+            'unit_name' => 'گزارش', 'max_units_per_run' => 3, 'revenue_share' => 30,
+        ];
+
+        Livewire::test(CreateAgent::class)
+            ->fillForm($base + ['config_schema' => [
+                ['key' => 'domain', 'label' => 'دامنه', 'type' => 'url', 'required' => true],
+                ['key' => 'domain', 'label' => 'تکراری', 'type' => 'text'],
+            ]])
+            ->call('create')
+            ->assertHasFormErrors(['config_schema']);
+
+        Livewire::test(CreateAgent::class)
+            ->fillForm($base + ['config_schema' => [
+                ['key' => 'domain', 'label' => 'دامنه', 'type' => 'url', 'required' => true],
+                ['key' => 'depth', 'label' => 'عمق', 'type' => 'select', 'default' => 'quick', 'options' => [['value' => 'quick', 'label' => 'سریع'], ['value' => 'deep', 'label' => 'کامل']]],
+            ]])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $undoRepeaterFake();
+        $agent = Agent::query()->where('slug', 'competitor-watch')->sole();
+        $this->assertSame(AgentDriver::Http, $agent->driver);
+        $this->assertStringStartsWith('ags_', $agent->signing_secret);
+        $this->assertSame(['domain', 'depth'], array_column($agent->config_schema, 'key'));
+        $this->assertSame('quick', $agent->config_schema[1]['default']);
+
+        Http::fake([
+            'agent.test/run' => Http::response(['ok' => true]),
+            'agent.test/manifest.json' => Http::response([
+                'name' => 'رصد رقبا', 'tagline' => 'قیمت و محصولات رقبا را هر روز بررسی می‌کند',
+                'publisher' => ['name' => 'استودیو نوآ', 'url' => 'https://noa.test'],
+                'config_schema' => [['key' => 'competitors', 'label' => 'رقبا', 'type' => 'tags', 'required' => true]],
+            ]),
+        ]);
+
+        Livewire::test(EditAgent::class, ['record' => $agent->getRouteKey()])
+            ->callAction('ping')
+            ->assertNotified('سرویس ایجنت پاسخ داد.')
+            ->callAction('importManifest', data: ['url' => 'https://agent.test/manifest.json'])
+            ->assertNotified('مشخصات ایجنت از manifest به‌روز شد.')
+            ->assertSchemaStateSet(['name' => 'رصد رقبا']);
+
+        $agent->refresh();
+        $this->assertSame(['استودیو نوآ', ['competitors']], [$agent->publisher_name, array_column($agent->config_schema, 'key')]);
+
+        $secret = $agent->signing_secret;
+        Livewire::test(EditAgent::class, ['record' => $agent->getRouteKey()])->callAction('rotateSecret');
+        $this->assertNotSame($secret, $agent->refresh()->signing_secret);
     }
 
     public function test_model_prices_are_entered_in_usd(): void
