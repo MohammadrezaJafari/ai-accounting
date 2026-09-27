@@ -5,11 +5,15 @@ namespace App\Filament\Resources\Agents\Tables;
 use App\Models\Agent;
 use App\Services\Agents\AgentStats;
 use App\Support\AgentDriver;
+use App\Support\AgentStatus;
 use App\Support\Money;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Marketplace agents with what their units earn, cost and owe their publisher, to check that
@@ -25,7 +29,15 @@ class AgentsTable
             ->defaultSort('sort_order')
             ->columns([
                 TextColumn::make('name')->label('ایجنت')->searchable()
-                    ->description(fn (Agent $record) => $record->publisher_name ? "ناشر: {$record->publisher_name}" : $record->category),
+                    ->description(fn (Agent $record) => $record->publisherDisplayName() ? "ناشر: {$record->publisherDisplayName()}" : $record->category),
+                TextColumn::make('status')->label('وضعیت')->badge()
+                    ->formatStateUsing(fn (AgentStatus $state, Agent $record) => $record->pending_changes ? 'تغییرات در انتظار بررسی' : $state->label())
+                    ->color(fn (AgentStatus $state, Agent $record) => match (true) {
+                        $state === AgentStatus::PendingReview, (bool) $record->pending_changes => 'warning',
+                        $state === AgentStatus::Approved => 'success',
+                        $state === AgentStatus::Rejected => 'danger',
+                        default => 'gray',
+                    }),
                 TextColumn::make('driver')->label('نوع')->badge()
                     ->formatStateUsing(fn (AgentDriver $state) => $state === AgentDriver::Http ? 'HTTP' : 'داخلی')
                     ->color(fn (AgentDriver $state) => $state === AgentDriver::Http ? 'info' : 'gray')
@@ -46,6 +58,12 @@ class AgentsTable
                     ->state(fn (Agent $record) => Money::format($stats($record)['p95_cost']))->extraAttributes(['dir' => 'ltr']),
                 ToggleColumn::make('is_active')->label('فعال'),
             ])
+            ->filters([
+                SelectFilter::make('status')->label('وضعیت')->options(AgentStatus::options()),
+                Filter::make('waiting')->label('در انتظار بررسی')
+                    ->query(fn (Builder $query) => $query->where(fn ($query) => $query->where('status', AgentStatus::PendingReview)->orWhereNotNull('pending_changes'))),
+            ])
+            ->modifyQueryUsing(fn (Builder $query) => $query->with('publisher'))
             ->recordActions([
                 EditAction::make(),
             ]);

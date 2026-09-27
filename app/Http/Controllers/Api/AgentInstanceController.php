@@ -30,7 +30,7 @@ class AgentInstanceController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         return AgentInstanceResource::collection(
-            $this->organization($request)->agentInstances()->with(['agent', 'app', 'latestRun', 'destinations'])->latest('id')->get()
+            $this->organization($request)->agentInstances()->where('is_test', false)->with(['agent', 'app', 'latestRun', 'destinations'])->latest('id')->get()
         );
     }
 
@@ -103,7 +103,7 @@ class AgentInstanceController extends Controller
 
     private function owned(Request $request, AgentInstance $instance): AgentInstance
     {
-        abort_unless($instance->organization_id === $this->organization($request)->id, 404);
+        abort_unless($instance->organization_id === $this->organization($request)->id && ! $instance->is_test, 404);
 
         return $instance;
     }

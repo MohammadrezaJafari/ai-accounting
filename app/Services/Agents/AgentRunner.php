@@ -2,11 +2,13 @@
 
 namespace App\Services\Agents;
 
+use App\Models\Agent;
 use App\Models\AgentInstance;
 use App\Models\AgentRun;
 use App\Notifications\AgentRunNotification;
 use App\Services\Agents\Delivery\ReportDelivery;
 use App\Support\OrganizationRole;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Notification;
 use Throwable;
 
@@ -16,7 +18,8 @@ use Throwable;
  * the run's model calls are totalled on it.
  *
  * An HTTP agent may accept the run and post its result later (complete / fail); runs whose
- * deadline passes without a result are failed by expireOverdue().
+ * deadline passes without a result are failed by expireOverdue(). A publisher's test run
+ * uses no credits and delivers nowhere.
  */
 class AgentRunner
 {
@@ -49,7 +52,10 @@ class AgentRunner
 
         $run->refresh()->load(['instance.app', 'instance.organization', 'agent', 'organization']);
 
-        if (! $this->credits->reserve($run)) {
+        if ($run->isTest()) {
+            // A publisher tries its listing as it will be once pending changes are approved.
+            $run->agent->fill(Arr::only($run->agent->pending_changes ?? [], Agent::PUBLISHER_FIELDS));
+        } elseif (! $this->credits->reserve($run)) {
             $this->finish($run, AgentRun::STATUS_NO_CREDITS, error: "اعتبار «{$run->agent->unit_name}» تمام شده است.");
             $this->notifyNoCredits($run);
 
@@ -79,6 +85,12 @@ class AgentRunner
         $run->loadMissing(['instance', 'agent', 'organization']);
         $run->instance->update(['state' => $result->state]);
         $units = min($result->units ?? 1, $run->agent->max_units_per_run);
+
+        if ($run->isTest()) {
+            $this->finish($run, $result->report === null ? AgentRun::STATUS_EMPTY : AgentRun::STATUS_SUCCEEDED, $result->report, $result->itemsFound, $result->meta, data: $result->data);
+
+            return $run;
+        }
 
         if ($result->report === null || $units < 1) {
             $this->credits->release($run);

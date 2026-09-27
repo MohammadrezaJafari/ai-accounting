@@ -43,10 +43,16 @@ class AgentForm
                         ->datalist(fn () => Agent::query()->whereNotNull('category')->distinct()->pluck('category')->all()),
                     TextInput::make('icon')->label('آیکون')->maxLength(50)->placeholder('smart_toy')->extraInputAttributes(['dir' => 'ltr'])
                         ->helperText('نام یک آیکون Material Icons، مثل feed، query_stats یا support_agent.'),
-                    TextInput::make('publisher_name')->label('ناشر')->maxLength(255)->placeholder('خالی = خود پلتفرم'),
-                    TextInput::make('publisher_url')->label('وب‌سایت ناشر')->url()->maxLength(500)->extraInputAttributes(['dir' => 'ltr']),
+                    Select::make('publisher_organization_id')->label('سازمان ناشر')->relationship('publisher', 'name')->searchable()->preload()->live()
+                        ->placeholder('خالی = خود پلتفرم یا ناشر بیرونی')
+                        ->helperText('ناشرِ عضو پلتفرم ایجنت را از پنل ناشر مدیریت می‌کند و سهمش در حسابش ثبت می‌شود.'),
+                    TextInput::make('publisher_name')->label('نام ناشر بیرونی')->maxLength(255)->placeholder('خالی = خود پلتفرم')
+                        ->hidden(fn (Get $get) => filled($get('publisher_organization_id'))),
+                    TextInput::make('publisher_url')->label('وب‌سایت ناشر')->url()->maxLength(500)->extraInputAttributes(['dir' => 'ltr'])
+                        ->hidden(fn (Get $get) => filled($get('publisher_organization_id'))),
                     TextInput::make('sort_order')->label('ترتیب نمایش')->numeric()->default(0),
-                    Toggle::make('is_active')->label('نمایش در بازارچه')->default(true)->inline(false),
+                    Toggle::make('is_active')->label('نمایش در بازارچه')->default(true)->inline(false)
+                        ->helperText('فقط ایجنت‌های تأییدشده در بازارچه دیده می‌شوند.'),
                 ]),
 
                 Section::make('اتصال')->columns(2)->columnSpanFull()

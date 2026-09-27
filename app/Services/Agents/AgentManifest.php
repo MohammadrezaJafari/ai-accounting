@@ -15,17 +15,24 @@ use InvalidArgumentException;
  */
 class AgentManifest
 {
+    public function __construct(private UrlGuard $guard) {}
+
     /**
-     * Listing attributes from the manifest at `$url`.
+     * Listing attributes from the manifest at `$url`. A publisher's manifest must be on the
+     * public internet (`$publicOnly`).
      *
      * @return array<string, mixed>
      *
-     * @throws AgentException with a message for the admin
+     * @throws AgentException with a message for the admin or publisher
      */
-    public function fetch(string $url): array
+    public function fetch(string $url, bool $publicOnly = false): array
     {
+        if ($publicOnly) {
+            $this->guard->assertPublic($url);
+        }
+
         try {
-            $response = Http::timeout(15)->acceptJson()->get($url);
+            $response = Http::timeout(15)->withOptions(['allow_redirects' => false])->acceptJson()->get($url);
         } catch (ConnectionException) {
             throw new AgentException('manifest در دسترس نبود.');
         }

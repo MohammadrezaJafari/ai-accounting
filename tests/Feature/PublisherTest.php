@@ -1,0 +1,207 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Agent;
+use App\Models\AgentCredit;
+use App\Models\AgentRun;
+use App\Models\Organization;
+use App\Models\PublisherPayout;
+use App\Models\User;
+use App\Notifications\PublisherReviewNotification;
+use App\Services\Agents\AgentRunner;
+use App\Services\Agents\UrlGuard;
+use App\Services\Publishers\PublisherService;
+use App\Support\AgentStatus;
+use App\Support\Money;
+use App\Support\OrganizationRole;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request as ClientRequest;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class PublisherTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private Organization $publisher;
+
+    /** What the publisher's service answers next. */
+    private mixed $reply = null;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Notification::fake();
+
+        $this->publisher = Organization::factory()->create(['name' => 'استودیو نوآ']);
+        Sanctum::actingAs(User::factory()->inOrganization($this->publisher, OrganizationRole::Developer)->create());
+
+        // Publisher hosts resolve to a public address, except the internal one.
+        $this->app->instance(UrlGuard::class, new UrlGuard(fn (string $host) => $host === 'internal.test' ? ['10.0.0.5'] : ['93.184.216.34']));
+        Http::fake(['agent.noa.test/*' => fn () => $this->reply]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function listing(array $overrides = []): array
+    {
+        return $overrides + [
+            'slug' => 'lead-finder',
+            'name' => 'یابندهٔ مشتری',
+            'tagline' => 'هر روز مشتری‌های بالقوه پیدا می‌کند',
+            'description' => 'توضیح کامل',
+            'icon' => 'person_search',
+            'category' => 'فروش',
+            'unit_name' => 'مشتری بالقوه',
+            'max_units_per_run' => 10,
+            'endpoint_url' => 'https://agent.noa.test/run',
+            'config_schema' => [
+                ['key' => 'industry', 'label' => 'صنعت', 'type' => 'text', 'required' => true],
+            ],
+            'packages' => [['units' => 50, 'price' => '10'], ['units' => 200, 'price' => '30']],
+        ];
+    }
+
+    private function createListing(array $overrides = []): Agent
+    {
+        $id = $this->postJson('/api/v1/publisher/agents', $this->listing($overrides))->assertCreated()->json('data.id');
+
+        return Agent::query()->findOrFail($id);
+    }
+
+    public function test_a_publisher_drafts_tests_and_submits_a_listing(): void
+    {
+        $this->postJson('/api/v1/publisher/agents', $this->listing(['endpoint_url' => 'https://internal.test/run', 'config_schema' => [['key' => 'Bad Key']]]))
+            ->assertJsonValidationErrors(['endpoint_url', 'config_schema']);
+
+        $agent = $this->createListing();
+        $this->assertSame([AgentStatus::Draft, false, 70], [$agent->status, $agent->is_active, $agent->revenue_share]);
+        $this->assertSame($this->publisher->id, $agent->publisher_organization_id);
+
+        $this->getJson("/api/v1/publisher/agents/{$agent->id}")->assertOk()
+            ->assertJsonPath('data.status', 'draft')
+            ->assertJsonPath('data.packages', [['units' => 50, 'price' => '10.00'], ['units' => 200, 'price' => '30.00']])
+            ->assertJsonPath('data.terms.max_cost_per_run', '0.10')
+            ->assertJsonPath('data.signing_secret', $agent->signing_secret);
+
+        // Not in the store until approved.
+        $this->getJson('/api/v1/agents')->assertOk()->assertJsonCount(0, 'data');
+
+        // A test run uses no credits and is checked against the listing's parameters.
+        $this->postJson("/api/v1/publisher/agents/{$agent->id}/test-runs", ['config' => []])->assertJsonValidationErrors('config.industry');
+        $this->reply = Http::response(['status' => 'succeeded', 'report' => '## ۳ مشتری', 'units' => 3, 'notes' => ['۳ شرکت پیدا شد.']]);
+        $runId = $this->postJson("/api/v1/publisher/agents/{$agent->id}/test-runs", ['config' => ['industry' => 'فین‌تک']])
+            ->assertStatus(202)->json('data.id');
+
+        $this->getJson("/api/v1/publisher/agents/{$agent->id}/runs/{$runId}")->assertOk()
+            ->assertJsonPath('data.status', 'succeeded')
+            ->assertJsonPath('data.trigger', 'test')
+            ->assertJsonPath('data.report', '## ۳ مشتری')
+            ->assertJsonPath('data.units', 0);
+        $this->assertSame('فین‌تک', json_decode(Http::recorded()->last()[0]->body(), true)['config']['industry']);
+
+        $this->getJson('/api/v1/agent-instances')->assertOk()->assertJsonCount(0, 'data');
+
+        $this->postJson("/api/v1/publisher/agents/{$agent->id}/submit")->assertOk()->assertJsonPath('data.status', 'pending_review');
+        $this->patchJson("/api/v1/publisher/agents/{$agent->id}", ['name' => 'نام تازه'])->assertOk();
+        $this->assertSame(['name' => 'نام تازه'], $agent->refresh()->pending_changes);
+        app(PublisherService::class)->approve($agent);
+        $this->assertSame(['نام تازه', null, AgentStatus::Approved], [$agent->refresh()->name, $agent->pending_changes, $agent->status]);
+
+        // Billing members may not edit listings; other organizations do not see them.
+        Sanctum::actingAs(User::factory()->inOrganization($this->publisher, OrganizationRole::Billing)->create());
+        $this->getJson("/api/v1/publisher/agents/{$agent->id}")->assertForbidden();
+        Sanctum::actingAs(User::factory()->inOrganization()->create());
+        $this->getJson("/api/v1/publisher/agents/{$agent->id}")->assertNotFound();
+    }
+
+    public function test_changes_to_a_live_listing_wait_for_review(): void
+    {
+        $agent = $this->createListing();
+        $publishers = app(PublisherService::class);
+        $publishers->submit($agent);
+        $publishers->approve($agent, 60);
+
+        $this->getJson('/api/v1/agents')->assertOk()->assertJsonPath('data.0.publisher.name', 'استودیو نوآ');
+
+        $this->patchJson("/api/v1/publisher/agents/{$agent->id}", [
+            'tagline' => 'معرفی تازه',
+            'endpoint_url' => 'https://agent.noa.test/v2',
+            'packages' => [['units' => 50, 'price' => '12']],
+        ])->assertOk()->assertJsonPath('data.pending_changes.tagline', 'معرفی تازه');
+
+        $agent->refresh();
+        $this->assertSame('هر روز مشتری‌های بالقوه پیدا می‌کند', $agent->tagline);
+
+        // Test runs already use the pending endpoint.
+        $this->reply = Http::response(['status' => 'empty']);
+        $this->postJson("/api/v1/publisher/agents/{$agent->id}/test-runs", ['config' => ['industry' => 'x']])->assertStatus(202);
+        Http::assertSent(fn (ClientRequest $request) => $request->url() === 'https://agent.noa.test/v2');
+
+        $publishers->applyChanges($agent);
+        $agent->refresh();
+        $this->assertSame(['معرفی تازه', 'https://agent.noa.test/v2', null], [$agent->tagline, $agent->endpoint_url, $agent->pending_changes]);
+        $this->assertSame([12], $agent->packages()->where('is_active', true)->pluck('price')->map(fn ($price) => (int) Money::toUsd($price))->all());
+        $this->assertSame(1, $agent->packages()->where('is_active', false)->count());
+
+        $this->patchJson("/api/v1/publisher/agents/{$agent->id}", ['name' => 'اسم بد'])->assertOk();
+        $publishers->reject($agent->refresh(), 'نام با محتوا نمی‌خواند.');
+        Notification::assertSentTo(
+            $this->publisher->members()->first(),
+            PublisherReviewNotification::class,
+            fn (PublisherReviewNotification $notification) => $notification->outcome === PublisherReviewNotification::CHANGES_REJECTED,
+        );
+        $this->getJson("/api/v1/publisher/agents/{$agent->id}")
+            ->assertJsonPath('data.status', 'approved')
+            ->assertJsonPath('data.pending_changes', null)
+            ->assertJsonPath('data.review_note', 'نام با محتوا نمی‌خواند.');
+        $this->deleteJson("/api/v1/publisher/agents/{$agent->id}")->assertUnprocessable();
+    }
+
+    public function test_the_publisher_earns_its_share_of_each_sale(): void
+    {
+        $agent = $this->createListing();
+        $publishers = app(PublisherService::class);
+        $publishers->approve($publishers->submit($agent), 70);
+
+        $customer = Organization::factory()->create();
+        User::factory()->inOrganization($customer)->create();
+        $app = $customer->apps()->create(['name' => 'App']);
+        AgentCredit::query()->create(['organization_id' => $customer->id, 'agent_id' => $agent->id, 'units' => 50, 'value' => Money::fromUsd('10')]);
+        $instance = $customer->agentInstances()->create(['agent_id' => $agent->id, 'app_id' => $app->id, 'name' => 'مشتری‌یابی', 'config' => ['industry' => 'فین‌تک']]);
+
+        $this->reply = Http::response(['status' => 'succeeded', 'report' => 'x', 'units' => 5]);
+        $runner = app(AgentRunner::class);
+        $run = $runner->execute($runner->start($instance, AgentRun::TRIGGER_MANUAL));
+
+        // 5 units of a $10 / 50 package = $1.00 revenue, 70% to the publisher.
+        $this->assertSame([5, Money::fromUsd('1'), Money::fromUsd('0.70')], [$run->units, $run->revenue, $run->publisher_share]);
+
+        PublisherPayout::query()->create(['organization_id' => $this->publisher->id, 'amount' => Money::fromUsd('0.50'), 'reference' => 'TX-1', 'paid_at' => now()]);
+
+        $response = $this->getJson('/api/v1/publisher')->assertOk()
+            ->assertJsonPath('summary.units', 5)
+            ->assertJsonPath('summary.revenue', '1.00')
+            ->assertJsonPath('summary.earned', '0.70')
+            ->assertJsonPath('summary.paid', '0.50')
+            ->assertJsonPath('summary.balance', '0.20')
+            ->assertJsonPath('summary.customers', 1)
+            ->assertJsonPath('payouts.0.reference', 'TX-1')
+            ->assertJsonPath('profile.payout_details', null);
+        $this->assertSame('0.70', collect($response->json('daily'))->last()['earned']);
+
+        $this->getJson("/api/v1/publisher/agents/{$agent->id}/runs/{$run->id}")->assertOk()
+            ->assertJsonPath('data.status', 'succeeded')
+            ->assertJsonPath('data.report', null);
+
+        $this->patchJson('/api/v1/publisher', ['publisher_name' => 'نوآ', 'payout_details' => 'IR000'])->assertForbidden();
+        Sanctum::actingAs(User::factory()->inOrganization($this->publisher, OrganizationRole::Owner)->create());
+        $this->patchJson('/api/v1/publisher', ['publisher_name' => 'نوآ', 'payout_details' => 'IR000'])->assertOk();
+        $this->getJson('/api/v1/publisher')->assertJsonPath('profile.payout_details', 'IR000');
+        $this->getJson('/api/v1/agents')->assertJsonPath('data.0.publisher.name', 'نوآ');
+    }
+}

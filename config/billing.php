@@ -30,4 +30,12 @@ return [
     'panel_url' => env('PANEL_URL', env('APP_URL', 'http://localhost')),
 
     'upstream_timeout' => (int) env('GATEWAY_UPSTREAM_TIMEOUT', 600),
+
+    // Marketplace agents made by publisher organizations: the publisher's default percent of
+    // the revenue, the default cap on one run's model spend (USD) and test runs per agent per day.
+    'publishers' => [
+        'revenue_share' => (int) env('PUBLISHER_REVENUE_SHARE', 70),
+        'max_cost_per_run_usd' => env('PUBLISHER_MAX_COST_PER_RUN_USD', '0.10'),
+        'test_runs_per_day' => (int) env('PUBLISHER_TEST_RUNS_PER_DAY', 30),
+    ],
 ];

@@ -26,7 +26,7 @@ class AgentController extends Controller
     {
         $credits = AgentCredit::query()->where('organization_id', $this->organization($request)->id)->pluck('units', 'agent_id');
 
-        $agents = Agent::query()->active()->orderBy('sort_order')
+        $agents = Agent::query()->active()->with('publisher')->orderBy('sort_order')
             ->with(['packages' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')])
             ->get()
             ->each(fn (Agent $agent) => $agent->setAttribute('credits', $credits[$agent->id] ?? 0));
@@ -43,7 +43,7 @@ class AgentController extends Controller
     public function purchase(Request $request, Agent $agent, AgentCreditService $credits): JsonResponse
     {
         $this->authorizeTo(OrganizationPermission::ManageBilling);
-        abort_unless($agent->is_active, 404);
+        abort_unless(Agent::query()->active()->whereKey($agent->id)->exists(), 404);
 
         $data = $request->validate([
             'package_id' => ['required', 'integer', Rule::exists('agent_packages', 'id')->where('agent_id', $agent->id)->where('is_active', true)],

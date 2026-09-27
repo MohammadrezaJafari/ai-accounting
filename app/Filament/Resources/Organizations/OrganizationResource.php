@@ -6,6 +6,7 @@ use App\Filament\Resources\Organizations\Pages\CreateOrganization;
 use App\Filament\Resources\Organizations\Pages\EditOrganization;
 use App\Filament\Resources\Organizations\Pages\ListOrganizations;
 use App\Filament\Resources\Organizations\RelationManagers\MembersRelationManager;
+use App\Filament\Resources\Organizations\RelationManagers\PayoutsRelationManager;
 use App\Filament\Resources\Organizations\Schemas\OrganizationForm;
 use App\Filament\Resources\Organizations\Tables\OrganizationsTable;
 use App\Filament\Resources\Users\RelationManagers\AppsRelationManager;
@@ -50,6 +51,7 @@ class OrganizationResource extends Resource
         return [
             MembersRelationManager::class,
             AppsRelationManager::class,
+            PayoutsRelationManager::class,
         ];
     }
 

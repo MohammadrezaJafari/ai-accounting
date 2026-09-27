@@ -6,8 +6,8 @@ namespace App\Support;
  * A member's role in an organization.
  *
  * - Owner: everything, including members and the organization itself.
- * - Developer: apps, API keys (and their spend limits) and the panel chat.
- * - Billing: wallets, top-ups, orders and app spend limits.
+ * - Developer: apps, API keys (and their spend limits), the panel chat and the organization's marketplace agents.
+ * - Billing: wallets, top-ups, orders, app spend limits and publisher payout details.
  *
  * Every member can see apps, usage and logs.
  */
@@ -30,7 +30,7 @@ enum OrganizationRole: string
     {
         return match ($this) {
             self::Owner => true,
-            self::Developer => in_array($permission, [OrganizationPermission::ManageApps, OrganizationPermission::ManageKeys, OrganizationPermission::UseChat], true),
+            self::Developer => in_array($permission, [OrganizationPermission::ManageApps, OrganizationPermission::ManageKeys, OrganizationPermission::UseChat, OrganizationPermission::PublishAgents], true),
             self::Billing => $permission === OrganizationPermission::ManageBilling,
         };
     }

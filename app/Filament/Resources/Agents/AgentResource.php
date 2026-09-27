@@ -10,6 +10,7 @@ use App\Filament\Resources\Agents\RelationManagers\RunsRelationManager;
 use App\Filament\Resources\Agents\Schemas\AgentForm;
 use App\Filament\Resources\Agents\Tables\AgentsTable;
 use App\Models\Agent;
+use App\Support\AgentStatus;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -17,7 +18,8 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
 /**
- * Agent products sold per unit: their packages, runs and cost per unit.
+ * Marketplace listings sold per unit: their packages, runs and cost per unit, and the review
+ * of listings made by publishers.
  */
 class AgentResource extends Resource
 {
@@ -34,6 +36,26 @@ class AgentResource extends Resource
     protected static ?string $pluralModelLabel = 'ایجنت‌ها';
 
     protected static ?string $recordTitleAttribute = 'name';
+
+    /**
+     * Listings waiting for review: new submissions and changes to live listings.
+     */
+    public static function getNavigationBadge(): ?string
+    {
+        $waiting = Agent::query()->where(fn ($query) => $query->where('status', AgentStatus::PendingReview)->orWhereNotNull('pending_changes'))->count();
+
+        return $waiting > 0 ? (string) $waiting : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'warning';
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'در انتظار بررسی';
+    }
 
     public static function form(Schema $schema): Schema
     {

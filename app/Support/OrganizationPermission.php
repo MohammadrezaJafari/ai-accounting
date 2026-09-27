@@ -12,4 +12,5 @@ enum OrganizationPermission: string
     case ManageBilling = 'manage-billing';
     case ManageMembers = 'manage-members';
     case UseChat = 'use-chat';
+    case PublishAgents = 'publish-agents';
 }

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\OrganizationRole;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -12,8 +13,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A customer account (a company or a person) that owns apps and has members with roles.
+ * It can also publish agents in the marketplace; `payout_details` (e.g. bank account) is encrypted.
  */
-#[Fillable(['name'])]
+#[Fillable(['name', 'publisher_name', 'publisher_url', 'support_email', 'payout_details'])]
+#[Hidden(['payout_details'])]
 class Organization extends Model
 {
     /** @use HasFactory<OrganizationFactory> */
@@ -25,6 +28,23 @@ class Organization extends Model
             ->using(OrganizationMember::class)
             ->withPivot(['id', 'role'])
             ->withTimestamps();
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'payout_details' => 'encrypted',
+        ];
+    }
+
+    public function publishedAgents(): HasMany
+    {
+        return $this->hasMany(Agent::class, 'publisher_organization_id');
+    }
+
+    public function payouts(): HasMany
+    {
+        return $this->hasMany(PublisherPayout::class);
     }
 
     public function apps(): HasMany

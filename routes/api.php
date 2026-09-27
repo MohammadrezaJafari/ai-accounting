@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\Api\PlaygroundController;
+use App\Http\Controllers\Api\PublisherAgentController;
+use App\Http\Controllers\Api\PublisherController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -75,6 +77,17 @@ Route::prefix('v1')->group(function () {
         Route::patch('agent-destinations/{agentDestination}', [AgentDestinationController::class, 'update']);
         Route::delete('agent-destinations/{agentDestination}', [AgentDestinationController::class, 'destroy']);
         Route::post('agent-destinations/{agentDestination}/test', [AgentDestinationController::class, 'test'])->middleware('throttle:10,1');
+
+        Route::get('publisher', [PublisherController::class, 'show']);
+        Route::patch('publisher', [PublisherController::class, 'update']);
+        Route::post('publisher/manifest', [PublisherAgentController::class, 'importManifest'])->middleware('throttle:10,1');
+        Route::apiResource('publisher/agents', PublisherAgentController::class)->parameters(['agents' => 'agent'])->names('publisher.agents');
+        Route::post('publisher/agents/{agent}/submit', [PublisherAgentController::class, 'submit']);
+        Route::post('publisher/agents/{agent}/ping', [PublisherAgentController::class, 'ping'])->middleware('throttle:20,1');
+        Route::post('publisher/agents/{agent}/rotate-secret', [PublisherAgentController::class, 'rotateSecret']);
+        Route::post('publisher/agents/{agent}/test-runs', [PublisherAgentController::class, 'testRun'])->middleware('throttle:10,1');
+        Route::get('publisher/agents/{agent}/runs', [PublisherAgentController::class, 'runs']);
+        Route::get('publisher/agents/{agent}/runs/{run}', [PublisherAgentController::class, 'showRun']);
 
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::post('notifications/read', [NotificationController::class, 'markAllRead']);

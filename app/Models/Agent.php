@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Support\AgentDriver;
+use App\Support\AgentStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
@@ -18,9 +20,12 @@ use Illuminate\Support\Str;
  * `model` is the default AI model, `allowed_models` those the agent may call (empty = any),
  * `max_cost_per_run` caps one run's model spend (nano-USD), `max_units_per_run` how many
  * units one run may use, and `revenue_share` the publisher's percent of the revenue.
+ *
+ * A listing made by a publisher organization goes through review (`status`); once approved,
+ * its changes wait in `pending_changes` until the admin applies them.
  */
 #[Fillable([
-    'slug', 'driver', 'endpoint_url', 'timeout_seconds', 'run_deadline_minutes', 'config_schema',
+    'publisher_organization_id', 'slug', 'status', 'pending_changes', 'review_note', 'submitted_at', 'reviewed_at', 'driver', 'endpoint_url', 'timeout_seconds', 'run_deadline_minutes', 'config_schema',
     'name', 'tagline', 'icon', 'category', 'publisher_name', 'publisher_url', 'revenue_share',
     'description', 'unit_name', 'max_units_per_run', 'model', 'allowed_models', 'max_cost_per_run', 'is_active', 'sort_order',
 ])]
@@ -29,7 +34,13 @@ class Agent extends Model
 {
     public const NEWS_MONITOR = 'news-monitor';
 
-    protected $attributes = ['driver' => 'http', 'max_units_per_run' => 1, 'timeout_seconds' => 60, 'run_deadline_minutes' => 15];
+    /** Fields a publisher may change; `packages` is handled alongside them. */
+    public const PUBLISHER_FIELDS = [
+        'name', 'tagline', 'description', 'icon', 'category', 'unit_name', 'max_units_per_run',
+        'endpoint_url', 'timeout_seconds', 'run_deadline_minutes', 'config_schema',
+    ];
+
+    protected $attributes = ['driver' => 'http', 'status' => 'approved', 'max_units_per_run' => 1, 'timeout_seconds' => 60, 'run_deadline_minutes' => 15];
 
     protected static function booted(): void
     {
@@ -47,6 +58,10 @@ class Agent extends Model
     {
         return [
             'driver' => AgentDriver::class,
+            'status' => AgentStatus::class,
+            'pending_changes' => 'array',
+            'submitted_at' => 'datetime',
+            'reviewed_at' => 'datetime',
             'signing_secret' => 'encrypted',
             'config_schema' => 'array',
             'allowed_models' => 'array',
@@ -58,6 +73,11 @@ class Agent extends Model
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
+    }
+
+    public function publisher(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class, 'publisher_organization_id');
     }
 
     public function packages(): HasMany
@@ -77,7 +97,19 @@ class Agent extends Model
 
     public function scopeActive(Builder $query): void
     {
-        $query->where('is_active', true);
+        $query->where('is_active', true)->where('status', AgentStatus::Approved);
+    }
+
+    /**
+     * The name shown as the publisher: the publisher organization's public name, or the one typed by the admin.
+     */
+    public function publisherDisplayName(): ?string
+    {
+        if ($this->publisher_organization_id) {
+            return $this->publisher?->publisher_name ?: $this->publisher?->name;
+        }
+
+        return $this->publisher_name;
     }
 
     /**

@@ -105,7 +105,8 @@ class AgentCreditService
 
     /**
      * Record the units a run's output is worth as used: the held unit plus, when the agent
-     * reports more, as many extra as the organization still has.
+     * reports more, as many extra as the organization still has. The publisher's share of
+     * their value is recorded on the run.
      */
     public function commit(AgentRun $run, int $units = 1): void
     {
@@ -122,6 +123,8 @@ class AgentCreditService
 
                 $run->forceFill(['units' => $run->units + $extra, 'revenue' => $run->revenue + $value])->save();
             }
+
+            $run->forceFill(['publisher_share' => intdiv($run->revenue * $run->agent->revenue_share, 100)])->save();
 
             AgentCreditTransaction::query()->create([
                 'organization_id' => $run->organization_id,

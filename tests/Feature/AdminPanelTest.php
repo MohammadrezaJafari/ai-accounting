@@ -11,15 +11,18 @@ use App\Filament\Resources\Apps\Pages\ListApps;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Organizations\Pages\EditOrganization;
 use App\Filament\Resources\Organizations\RelationManagers\MembersRelationManager;
+use App\Filament\Resources\Publishers\Pages\ListPublishers;
 use App\Models\Agent;
 use App\Models\AiModel;
 use App\Models\Order;
 use App\Models\Organization;
 use App\Models\Provider;
 use App\Models\User;
+use App\Notifications\PublisherReviewNotification;
 use App\Services\OrderService;
 use App\Services\SettingsService;
 use App\Support\AgentDriver;
+use App\Support\AgentStatus;
 use App\Support\Money;
 use App\Support\OrganizationRole;
 use Database\Seeders\AgentSeeder;
@@ -28,6 +31,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Forms\Components\Repeater;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -60,7 +64,7 @@ class AdminPanelTest extends TestCase
 
         foreach (['/admin', '/admin/providers', "/admin/providers/{$provider->id}/edit", '/admin/models', '/admin/packages',
             '/admin/users', '/admin/apps', "/admin/apps/{$app->id}/edit", '/admin/orders', '/admin/usage', '/admin/billing-settings',
-            '/admin/organizations', "/admin/organizations/{$app->organization_id}/edit", '/admin/agents', "/admin/agents/{$agent->id}/edit"] as $url) {
+            '/admin/organizations', "/admin/organizations/{$app->organization_id}/edit", '/admin/agents', "/admin/agents/{$agent->id}/edit", '/admin/publishers'] as $url) {
             $this->get($url)->assertOk();
         }
     }
@@ -119,6 +123,42 @@ class AdminPanelTest extends TestCase
         $secret = $agent->signing_secret;
         Livewire::test(EditAgent::class, ['record' => $agent->getRouteKey()])->callAction('rotateSecret');
         $this->assertNotSame($secret, $agent->refresh()->signing_secret);
+    }
+
+    public function test_admin_reviews_a_publisher_listing_and_records_a_payout(): void
+    {
+        Notification::fake();
+        $publisher = Organization::factory()->create(['name' => 'استودیو نوآ']);
+        User::factory()->inOrganization($publisher)->create();
+        $agent = Agent::query()->create([
+            'publisher_organization_id' => $publisher->id, 'slug' => 'lead-finder', 'status' => AgentStatus::PendingReview,
+            'name' => 'یابندهٔ مشتری', 'unit_name' => 'مشتری', 'endpoint_url' => 'https://agent.noa.test/run', 'is_active' => false,
+            'revenue_share' => 70, 'pending_changes' => ['tagline' => 'معرفی'],
+        ]);
+        $this->actingAs($this->admin);
+
+        $this->get('/admin/agents')->assertOk()->assertSee('در انتظار بررسی');
+
+        Livewire::test(EditAgent::class, ['record' => $agent->getRouteKey()])
+            ->callAction('approve', data: ['revenue_share' => 65])
+            ->assertHasNoActionErrors();
+
+        $agent->refresh();
+        $this->assertSame([AgentStatus::Approved, true, 65, 'معرفی', null], [$agent->status, $agent->is_active, $agent->revenue_share, $agent->tagline, $agent->pending_changes]);
+        Notification::assertSentTo($publisher->members()->first(), PublisherReviewNotification::class);
+
+        $agent->update(['pending_changes' => ['name' => 'نام تازه']]);
+        Livewire::test(EditAgent::class, ['record' => $agent->getRouteKey()])
+            ->assertActionVisible('applyChanges')
+            ->callAction('reject', data: ['note' => 'نام مناسب نیست'])
+            ->assertHasNoActionErrors();
+        $this->assertSame(['یابندهٔ مشتری', null, 'نام مناسب نیست'], [$agent->refresh()->name, $agent->pending_changes, $agent->review_note]);
+
+        $this->get('/admin/publishers')->assertOk()->assertSee('استودیو نوآ');
+        Livewire::test(ListPublishers::class)
+            ->callAction(TestAction::make('recordPayout')->table($publisher), data: ['amount' => '12.5', 'paid_at' => now()->toDateTimeString(), 'reference' => 'TX-9'])
+            ->assertHasNoFormErrors();
+        $this->assertSame([Money::fromUsd('12.5'), 'TX-9', $this->admin->id], [$publisher->payouts()->sole()->amount, $publisher->payouts()->sole()->reference, $publisher->payouts()->sole()->created_by]);
     }
 
     public function test_model_prices_are_entered_in_usd(): void

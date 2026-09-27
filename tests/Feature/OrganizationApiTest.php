@@ -52,7 +52,7 @@ class OrganizationApiTest extends TestCase
         $this->getJson('/api/v1/auth/me')
             ->assertOk()
             ->assertJsonPath('data.email', 'sara@example.com')
-            ->assertJsonPath('organization.permissions', ['manage-apps', 'manage-keys', 'manage-billing', 'manage-members', 'use-chat']);
+            ->assertJsonPath('organization.permissions', ['manage-apps', 'manage-keys', 'manage-billing', 'manage-members', 'use-chat', 'publish-agents']);
     }
 
     public function test_customers_without_an_organization_get_a_personal_one(): void

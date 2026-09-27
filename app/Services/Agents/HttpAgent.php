@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\Http;
  */
 class HttpAgent implements AgentHandler
 {
+    public function __construct(private UrlGuard $guard) {}
+
     public function run(AgentRun $run, AgentLlm $llm): AgentResult
     {
         $agent = $run->agent;
@@ -85,11 +87,17 @@ class HttpAgent implements AgentHandler
             throw new AgentException('آدرس سرویس این ایجنت تنظیم نشده است.');
         }
 
+        // A publisher's service must be on the public internet; the admin's may be internal.
+        if ($agent->publisher_organization_id) {
+            $this->guard->assertPublic($agent->endpoint_url);
+        }
+
         $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $timestamp = (string) now()->timestamp;
 
         try {
             return Http::timeout($timeout ?? $agent->timeout_seconds)
+                ->withOptions(['allow_redirects' => false])
                 ->acceptJson()
                 ->withHeaders([
                     'X-Agent-Slug' => $agent->slug,
