@@ -27,7 +27,7 @@ use NumberFormatter;
  */
 class PublisherService
 {
-    public function __construct(private AgentRunner $runner) {}
+    public function __construct(private AgentRunner $runner, private PublisherEarnings $earnings) {}
 
     /**
      * A new draft listing. Model access, cost cap and revenue share start at the platform
@@ -202,6 +202,12 @@ class PublisherService
      */
     public function startTestRun(Agent $agent, array $config, User $by): AgentRun
     {
+        if ($this->earnings->testRunsBlocked($agent->publisher)) {
+            $limit = Money::format(Money::fromUsd(config('billing.publishers.test_run_debt_limit_usd')));
+
+            throw ValidationException::withMessages(['run' => "بدهی حساب ناشر از {$limit} بیشتر شده است؛ اجرای آزمایشی تا جبران آن با فروش یا واریز بسته است."]);
+        }
+
         $today = $agent->runs()->where('trigger', AgentRun::TRIGGER_TEST)->where('created_at', '>=', now()->startOfDay())->count();
 
         if ($today >= config('billing.publishers.test_runs_per_day')) {

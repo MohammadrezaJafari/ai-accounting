@@ -206,6 +206,14 @@ class PublisherTest extends TestCase
             ->assertJsonPath('data.status', 'succeeded')
             ->assertJsonPath('data.report', null);
 
+        // Paid out more than earned: the balance may go $5 below zero before test runs stop.
+        PublisherPayout::query()->create(['organization_id' => $this->publisher->id, 'amount' => Money::fromUsd('5'), 'paid_at' => now()]);
+        $this->postJson("/api/v1/publisher/agents/{$agent->id}/test-runs", ['config' => ['industry' => 'x']])->assertStatus(202);
+        PublisherPayout::query()->create(['organization_id' => $this->publisher->id, 'amount' => Money::fromUsd('1'), 'paid_at' => now()]);
+        $this->getJson('/api/v1/publisher')->assertJsonPath('summary.balance', '-5.80')->assertJsonPath('test_runs_blocked', true);
+        $this->getJson("/api/v1/publisher/agents/{$agent->id}")->assertJsonPath('data.terms.test_runs_blocked', true);
+        $this->postJson("/api/v1/publisher/agents/{$agent->id}/test-runs", ['config' => ['industry' => 'x']])->assertJsonValidationErrors('run');
+
         $this->patchJson('/api/v1/publisher', ['publisher_name' => 'نوآ', 'payout_details' => 'IR000'])->assertForbidden();
         Sanctum::actingAs(User::factory()->inOrganization($this->publisher, OrganizationRole::Owner)->create());
         $this->patchJson('/api/v1/publisher', ['publisher_name' => 'نوآ', 'payout_details' => 'IR000'])->assertOk();

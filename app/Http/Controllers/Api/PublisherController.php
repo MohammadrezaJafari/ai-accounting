@@ -36,6 +36,8 @@ class PublisherController extends Controller
                 ...$summary,
                 ...collect($summary)->only(['revenue', 'share', 'model_cost', 'earned', 'paid', 'balance'])->map(fn (int $amount) => Money::toUsd($amount))->all(),
             ],
+            'test_runs_blocked' => $earnings->testRunsBlocked($organization),
+            'test_run_debt_limit' => Money::toUsd(Money::fromUsd(config('billing.publishers.test_run_debt_limit_usd'))),
             'daily' => array_map(fn (array $day) => [...$day, 'earned' => Money::toUsd($day['earned'])], $earnings->daily($organization)),
             'payouts' => PublisherPayoutResource::collection($organization->payouts()->latest('paid_at')->limit(50)->get()),
         ]);

@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Services\Agents\ConfigSchema;
+use App\Services\Publishers\PublisherEarnings;
 use App\Services\Publishers\PublisherService;
 use App\Support\Money;
 use Illuminate\Http\Request;
@@ -44,6 +45,8 @@ class PublisherAgentResource extends JsonResource
                 'revenue_share' => $this->revenue_share,
                 'max_cost_per_run' => $this->max_cost_per_run === null ? null : Money::toUsd($this->max_cost_per_run),
                 'max_cost_ceiling' => Money::toUsd($this->costCeiling()),
+                'test_run_debt_limit' => Money::toUsd(Money::fromUsd(config('billing.publishers.test_run_debt_limit_usd'))),
+                'test_runs_blocked' => $this->publisher && app(PublisherEarnings::class)->testRunsBlocked($this->publisher),
                 'default_model' => $this->model,
                 'allowed_models' => $this->allowed_models ?? [],
             ],

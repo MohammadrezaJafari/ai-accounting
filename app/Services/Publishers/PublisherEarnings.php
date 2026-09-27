@@ -5,6 +5,7 @@ namespace App\Services\Publishers;
 use App\Models\Agent;
 use App\Models\AgentRun;
 use App\Models\Organization;
+use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -40,6 +41,15 @@ class PublisherEarnings
             'customers' => (int) $sales->customers,
             'live_agents' => $publisher->publishedAgents()->active()->count(),
         ];
+    }
+
+    /**
+     * Whether the publisher owes more than the platform allows for trying its agents: its test
+     * runs stop until sales (or a settlement) bring the balance back up. Customers' runs go on.
+     */
+    public function testRunsBlocked(Organization $publisher): bool
+    {
+        return $this->summary($publisher)['balance'] < -Money::fromUsd(config('billing.publishers.test_run_debt_limit_usd'));
     }
 
     /**
