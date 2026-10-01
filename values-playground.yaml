@@ -1,0 +1,180 @@
+---
+# وب: پنل مدیریت Filament (/admin)، API پنل مشتری (/api/v1)، gateway مدل‌ها (/v1) و API ایجنت‌ها (/agent-api).
+# ConfigMap همین release (ai-accounting) منبع مشترک تنظیمات است؛ scheduler هم از آن می‌خواند.
+# اسرار در Secret جداگانه‌ی ai-accounting-env هستند که دستی ساخته می‌شود (README.md، بخش استقرار):
+# APP_KEY، DB_PASSWORD، و در صورت نیاز TELEGRAM_BOT_TOKEN / BALE_BOT_TOKEN. کلید ارائه‌دهنده‌های مدل در
+# پنل مدیریت وارد می‌شود و در دیتابیس رمزشده می‌ماند.
+nameOverride: ai-accounting
+fullnameOverride: ""
+
+image:
+  repository: harbor.rahap.site/ai/ai-accounting/playground
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: reg-auth
+
+replicaCount: 1
+
+# نود playground از نظر memory request تقریباً پر است؛ Recreate تا pod تازه منتظر جای خالی کنار pod قدیمی نماند.
+strategy:
+  type: Recreate
+  rollingUpdate: null
+
+minReadySeconds: 0
+
+podLabels: {}
+podAnnotations: {}
+
+env: []
+
+envFrom:
+  - secretRef:
+      name: ai-accounting-env
+
+command:
+  - /bin/sh
+  - -c
+args:
+  - |
+    set -eu
+    php artisan migrate --force
+    php artisan config:cache
+    php artisan route:cache
+    php artisan view:cache
+    exec frankenphp run --config /etc/frankenphp/Caddyfile --adapter caddyfile
+
+livenessProbe:
+  httpGet:
+    path: /up
+    port: http
+  initialDelaySeconds: 60
+  periodSeconds: 20
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /up
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+startupProbe: {}
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 768Mi
+  requests:
+    cpu: 100m
+    memory: 192Mi
+
+containerSecurityContext: {}
+podSecurityContext: {}
+
+service:
+  enabled: true
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  protocol: TCP
+  annotations: {}
+
+configmap:
+  enabled: true
+  data:
+    APP_NAME: "AI Accounting"
+    APP_ENV: "playground"
+    APP_DEBUG: "true"
+    # آدرس پنل مدیریت؛ result_url و llm_base_url ایجنت‌های خارجی هم از همین ساخته می‌شود.
+    APP_URL: "https://ai-panel.pg.rahap.site"
+    # پنل مشتری (لینک دعوت‌نامه‌ها).
+    PANEL_URL: "https://ai.pg.rahap.site"
+    APP_LOCALE: "fa"
+    APP_FALLBACK_LOCALE: "en"
+    APP_FAKER_LOCALE: "fa_IR"
+    APP_MAINTENANCE_DRIVER: "file"
+    BCRYPT_ROUNDS: "12"
+    LOG_CHANNEL: "stderr"
+    LOG_LEVEL: "debug"
+    LOG_DEPRECATIONS_CHANNEL: "null"
+    DB_CONNECTION: "mariadb"
+    DB_HOST: "mariadb"
+    DB_PORT: "3306"
+    DB_DATABASE: "ai_accounting"
+    DB_USERNAME: "ai_accounting"
+    SESSION_DRIVER: "database"
+    SESSION_LIFETIME: "120"
+    SESSION_ENCRYPT: "false"
+    SESSION_PATH: "/"
+    SESSION_DOMAIN: "null"
+    SESSION_SECURE_COOKIE: "true"
+    BROADCAST_CONNECTION: "log"
+    QUEUE_CONNECTION: "database"
+    DB_QUEUE_RETRY_AFTER: "1000"
+    CACHE_STORE: "database"
+    FILESYSTEM_DISK: "local"
+    MAIL_MAILER: "log"
+    MAIL_FROM_ADDRESS: "ai@rahap.site"
+    MAIL_FROM_NAME: "AI Accounting"
+    # صورت‌حساب و gateway
+    BILLING_DEFAULT_MARKUP_BPS: "2000"
+    BILLING_MIN_BALANCE_USD: "0"
+    BILLING_CUSTOM_TOPUP_ENABLED: "true"
+    BILLING_CUSTOM_TOPUP_MIN_USD: "5"
+    BILLING_CUSTOM_TOPUP_MAX_USD: "1000"
+    BILLING_PAYMENT_GATEWAY: "manual"
+    BILLING_DISPLAY_TIMEZONE: "Asia/Tehran"
+    GATEWAY_UPSTREAM_TIMEOUT: "600"
+    # بازارچه‌ی ناشران
+    PUBLISHER_REVENUE_SHARE: "70"
+    PUBLISHER_MAX_COST_PER_RUN_USD: "0.10"
+    PUBLISHER_MAX_COST_CEILING_USD: "1.00"
+    PUBLISHER_TEST_RUNS_PER_DAY: "30"
+    PUBLISHER_TEST_RUN_DEBT_LIMIT_USD: "5.00"
+    PUBLISHER_ALLOW_PRIVATE_ENDPOINTS: "false"
+  mount:
+    enabled: false
+    mountPath: /etc/config
+    readOnly: true
+
+secret:
+  enabled: false
+
+gateway:
+  enabled: false
+
+httproute:
+  enabled: true
+  parentRefs:
+    - name: general-gateway
+      namespace: gateway
+      sectionName: http
+  hostnames:
+    - "ai-panel.pg.rahap.site"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: "{{ include \"chart.fullname\" . }}"
+          port: 80
+          weight: 1
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: X-Forwarded-Proto
+                value: https
+
+# نود مخصوص playground (k8s-worker-3)
+nodeSelector:
+  workload-class: playground
+tolerations:
+  - key: dedicated
+    operator: Equal
+    value: playground
+    effect: NoSchedule
+affinity: {}

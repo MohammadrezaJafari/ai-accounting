@@ -1,0 +1,90 @@
+---
+# زمان‌بند — agents:run-due هر دقیقه: اجرای ایجنت‌های موعدرسیده و شکست اجراهای از مهلت گذشته.
+# تنظیمات از ConfigMap همان release وب (ai-accounting) و اسرار از Secret ai-accounting-env خوانده می‌شود.
+nameOverride: ai-accounting-scheduler
+fullnameOverride: ""
+
+image:
+  repository: harbor.rahap.site/ai/ai-accounting/playground
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: reg-auth
+
+replicaCount: 1
+
+strategy:
+  type: Recreate
+  rollingUpdate: null
+
+minReadySeconds: 0
+
+podLabels: {}
+podAnnotations: {}
+
+env: []
+
+envFrom:
+  - configMapRef:
+      name: ai-accounting
+  - secretRef:
+      name: ai-accounting-env
+
+command:
+  - php
+  - artisan
+  - schedule:work
+args: []
+
+livenessProbe: null
+
+readinessProbe: null
+
+startupProbe: {}
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 20m
+    memory: 64Mi
+
+containerSecurityContext: {}
+podSecurityContext: {}
+
+service:
+  enabled: false
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  protocol: TCP
+  annotations: {}
+
+configmap:
+  enabled: false
+  data: {}
+  mount:
+    enabled: false
+    mountPath: /etc/config
+    readOnly: true
+
+secret:
+  enabled: false
+
+gateway:
+  enabled: false
+
+httproute:
+  enabled: false
+
+# نود مخصوص playground (k8s-worker-3)
+nodeSelector:
+  workload-class: playground
+tolerations:
+  - key: dedicated
+    operator: Equal
+    value: playground
+    effect: NoSchedule
+affinity: {}

@@ -1,0 +1,64 @@
+---
+stages:
+  - build
+  - deploy
+
+include:
+
+  # =========================
+  # PLAYGROUND BUILD
+  # =========================
+
+  - component: gitlab.rahap.site/devops/cicd-catalog/build@main
+    inputs:
+      job_name: "ai-accounting-playground"
+      job_tags:
+        - shared-runner
+      job_rules:
+        - if: '$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != "main"'
+          when: manual
+          allow_failure: false
+      registry: harbor.rahap.site
+      image_name: ai/ai-accounting/playground
+      dockerfile: Dockerfile
+      dockerfile_path: .
+      build_args: ""
+
+  # =========================
+  # PLAYGROUND DEPLOY
+  # =========================
+
+  # وب اول می‌رود: migrate را اجرا می‌کند و ConfigMap مشترک (ai-accounting) را می‌سازد.
+  - component: gitlab.rahap.site/devops/cicd-catalog/deploy@main
+    inputs:
+      job_name: "ai-accounting-playground"
+      job_tags:
+        - shared-runner
+      job_rules:
+        - if: '$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != "main"'
+          when: manual
+          allow_failure: false
+      job_needs:
+        - "Build: ai-accounting-playground"
+      registry: harbor.rahap.site
+      service_image_name: ai/ai-accounting/playground
+      helm_release_name: ai-accounting
+      helm_namespace: playground
+      helm_values_file: values-playground.yaml
+
+  # زمان‌بند: agents:run-due هر دقیقه (اجراهای زمان‌بندی‌شده inline انجام می‌شوند؛ صف جدا لازم نیست).
+  - component: gitlab.rahap.site/devops/cicd-catalog/deploy@main
+    inputs:
+      job_name: "ai-accounting-scheduler-playground"
+      job_tags:
+        - shared-runner
+      job_rules:
+        - if: '$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != "main"'
+          when: on_success
+      job_needs:
+        - "Deploy: ai-accounting-playground"
+      registry: harbor.rahap.site
+      service_image_name: ai/ai-accounting/playground
+      helm_release_name: ai-accounting-scheduler
+      helm_namespace: playground
+      helm_values_file: values-scheduler-playground.yaml

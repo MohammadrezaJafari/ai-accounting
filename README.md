@@ -256,3 +256,32 @@ php artisan serve
 ```bash
 php artisan test
 ```
+
+## استقرار روی playground
+
+هر اپ مخزن و استقرار خودش را دارد: این مخزن (`gitlab.rahap.site/ai/ai-accounting`) پنل مدیریت، API مشتری، gateway
+و API ایجنت‌ها را می‌دهد و [ai-accounting-web-app](https://gitlab.rahap.site/ai/ai-accounting-web-app) پنل مشتری را.
+CI (`.gitlab-ci.yml`) روی شاخه‌ی `dev` اجرا می‌شود: `Build` (دستی) → `Deploy: ai-accounting-playground` (دستی؛ migrate و
+ConfigMap مشترک) → `Deploy: ai-accounting-scheduler-playground` (خودکار؛ `agents:run-due` هر دقیقه). صف جدا لازم نیست:
+اجرای دستی بعد از پاسخ HTTP و اجرای زمان‌بندی‌شده داخل خود زمان‌بند انجام می‌شود.
+
+| | |
+|---|---|
+| پنل مدیریت | `https://ai-panel.pg.rahap.site/admin` (release `ai-accounting`, `values-playground.yaml`) |
+| پنل مشتری و gateway | `https://ai.pg.rahap.site` — `/api` و `/v1` با HTTPRoute وب‌اپ به همین سرویس می‌رسند |
+| دیتابیس | MariaDB مشترک، `ai_accounting` |
+| اسرار | Secret `ai-accounting-env`: `APP_KEY`، `DB_PASSWORD`، و در صورت نیاز `TELEGRAM_BOT_TOKEN` / `BALE_BOT_TOKEN`. کلید ارائه‌دهنده‌ها در پنل مدیریت وارد و رمزشده در دیتابیس نگه داشته می‌شود |
+
+تنظیمات غیرمحرمانه در `configmap.data` همان values است. پوشه‌ی `storage` روی دیسک pod است و با هر استقرار از بین
+می‌رود؛ برنامه فایلی آپلود نمی‌کند، پس چیزی گم نمی‌شود. seed اولیه (ادمین، کاتالوگ مدل‌ها، ایجنت پایش خبر) با
+`kubectl -n playground exec deploy/ai-accounting -- php artisan db:seed --force` و متغیرهای `ADMIN_EMAIL` /
+`ADMIN_PASSWORD` در Secret انجام می‌شود؛ رمز ادمین را بلافاصله عوض کنید.
+
+### مقصد «پیام‌رسان رهاپ»
+
+کنار تلگرام، بله، ایمیل و وب‌هوک، هر ایجنت می‌تواند گزارشش را به کانالی در پیام‌رسان رهاپ بفرستد: در کانال از
+«برنامه‌ها» یک وب‌هوک ورودی بسازید و آدرس `…/hooks/{secret}` آن را به‌عنوان مقصد `rahap` بدهید. گزارش به‌صورت یک پیام
+Markdown با نام ایجنت فرستاده می‌شود. ایجنت‌ها هم `kind` دارند: `report` (زمان‌بندی‌شده، همین‌ها) یا `interactive`
+(در پیام‌رسان زندگی می‌کند و این‌جا فقط فروخته و شمرده می‌شود)؛ Company OS از روی آن تصمیم می‌گیرد «افزودن به فضای کار»
+کجا برود.
+
