@@ -61,6 +61,8 @@ client.messages.create(model="claude-sonnet-4-5", max_tokens=1024, messages=[{"r
 | متد | مسیر | توضیح |
 |---|---|---|
 | POST | `auth/register`, `auth/login` | برمی‌گرداند: `{ token, user, organization, organizations }` (Sanctum bearer). ثبت‌نام فیلد اختیاری `organization` (نام سازمان) دارد |
+| GET | `auth/methods` | روش‌های ورود: `{password, oidc, oidc_url, oidc_logout_url, tenant_required}` |
+| POST | `auth/oidc/exchange` | `{code}` یک‌بارمصرف از برگشت ورود سازمانی ← همان پاسخ `auth/login` |
 | GET/POST | `auth/me`, `auth/logout` | `me`: کاربر، سازمان فعلی با نقش و دسترسی‌ها، و همهٔ سازمان‌ها |
 | GET | `dashboard?days=30` | موجودی کل، جمع مصرف، مصرف روزانه، مصرف به تفکیک مدل و اپ |
 | GET | `catalog/models?app_id=` | مدل‌ها با قیمت فروش (قیمت خرید هیچ‌وقت نمایش داده نمی‌شود) |
@@ -89,14 +91,16 @@ client.messages.create(model="claude-sonnet-4-5", max_tokens=1024, messages=[{"r
 
 هر کاربر هنگام ثبت‌نام یک سازمان می‌سازد و مالک آن می‌شود. هر کاربر می‌تواند عضو چند سازمان باشد. API پنل همیشه روی **سازمان فعلی** کاربر کار می‌کند.
 
-| کار | مالک | توسعه‌دهنده | مالی |
-|---|:-:|:-:|:-:|
-| دیدن اپ‌ها، مصرف، لاگ‌ها و اعضا | ✓ | ✓ | ✓ |
-| ساخت و ویرایش اپ | ✓ | ✓ | |
-| کلیدهای API و سقف هزینهٔ کلیدها | ✓ | ✓ | |
-| چت پنل | ✓ | ✓ | |
-| کیف پول، شارژ، سفارش‌ها، تراکنش‌ها و سقف هزینهٔ اپ‌ها | ✓ | | ✓ |
-| اعضا، دعوت‌ها و نام سازمان | ✓ | | |
+| کار | مالک | توسعه‌دهنده | مالی | عضو |
+|---|:-:|:-:|:-:|:-:|
+| دیدن اپ‌ها، مصرف، لاگ‌ها و اعضا | ✓ | ✓ | ✓ | ✓ |
+| ساخت و ویرایش اپ | ✓ | ✓ | | |
+| کلیدهای API و سقف هزینهٔ کلیدها | ✓ | ✓ | | |
+| چت پنل | ✓ | ✓ | | |
+| کیف پول، شارژ، سفارش‌ها، تراکنش‌ها و سقف هزینهٔ اپ‌ها | ✓ | | ✓ | |
+| اعضا، دعوت‌ها و نام سازمان | ✓ | | | |
+
+نقش «عضو» فقط‌خواندنی است؛ اعضای `member` و `reader` هاب رهاپ این نقش را می‌گیرند.
 
 - **دعوت:** مالک ایمیل و نقش را وارد می‌کند. لینک دعوت (`PANEL_URL/invite/{token}`) ایمیل می‌شود و در پاسخ API هم برمی‌گردد تا بشود دستی فرستاد. دعوت را فقط کاربری می‌تواند بپذیرد که با همان ایمیل وارد شده باشد. لینک ۷ روز اعتبار دارد.
 - هر سازمان همیشه دست‌کم یک مالک دارد.
@@ -235,6 +239,27 @@ client = OpenAI(base_url=payload["platform"]["llm_base_url"], api_key=payload["p
 - `fake`: سفارش فوراً پرداخت‌شده ثبت می‌شود. فقط برای توسعه.
 
 برای اضافه‌کردن درگاه واقعی (زرین‌پال، Stripe، کریپتو و …)، `App\Services\Payments\PaymentGateway` را پیاده‌سازی کنید و آن را در `PaymentManager` ثبت کنید. callback درگاه باید در نهایت `OrderService::markPaid()` را صدا بزند. این متد idempotent است.
+
+## ورود سازمانی و provisioning
+
+پیاده‌سازی قرارداد سرویس محصولات رهاپ (`docs/architecture/service-contract-fa.md` در company-os). هر دو بخش اختیاری‌اند: با `OIDC_ISSUER` و `SERVICE_KEY` خالی همه‌چیز مثل قبل است.
+
+**ورود با حساب سازمانی (OpenID Connect، مثلاً Keycloak).** متغیرها: `OIDC_ISSUER` (در نصب مشترک با الگو، مثل `https://sso.example/realms/{tenant}`)، `OIDC_CLIENT_ID`، `OIDC_CLIENT_SECRET`، `OIDC_AUTO_PROVISION` (پیش‌فرض `true`)، `OIDC_ONLY` (پیش‌فرض `false`؛ ورود و ثبت‌نام با رمز را می‌بندد)، `OIDC_TENANTS` (tenantهای پذیرفته با کاما؛ خالی یعنی tenantهایی که provisioning شده‌اند)، `OIDC_GROUPS_CLAIM`، `OIDC_ROLES_CLAIM`.
+
+| مسیر | کار |
+|---|---|
+| `GET /auth/oidc/redirect?tenant=&intended=/…` | شروع ورود با PKCE؛ `tenant` فقط وقتی issuer الگو دارد؛ `intended` فقط مسیر نسبی پنل |
+| `GET /auth/oidc/callback` | اعتبارسنجی id_token (امضای JWKS با openssl، `iss`، `aud`، `nonce`، `exp`) و userinfo؛ بعد برگشت به `PANEL_URL/login?redirect=…#oidc_code=…` |
+| `POST /api/v1/auth/oidc/exchange` | پنل کد یک‌بارمصرف (۲ دقیقه) را با توکن Sanctum عوض می‌کند؛ پاسخ همان `auth/login` است |
+| `GET /auth/oidc/logout` | خروج از سامانه هویت (`end_session_endpoint` با `id_token_hint`) و برگشت به پنل |
+| `POST /auth/backchannel-logout` | Back-Channel Logout: توکن‌های پنلِ آن `sid` (یا همهٔ توکن‌های پنلِ آن `sub`) باطل می‌شوند |
+
+کاربر با `(oidc_issuer, oidc_subject)` شناخته می‌شود. حساب موجود فقط با ایمیلِ تأییدشده (`email_verified`) پیوند می‌خورد و هیچ‌وقت به هویتِ tenant دیگری وصل نمی‌شود. ورود نقش کسی را در سازمان عوض نمی‌کند؛ نقش از provisioning می‌آید. در redirect و backchannel، Keycloak را روی `{APP_URL}/auth/oidc/callback` و `{APP_URL}/auth/backchannel-logout` تنظیم کنید. پنل (ai-accounting-web-app) هنوز دکمهٔ «ورود با حساب سازمانی» و خواندن `#oidc_code` را ندارد.
+
+**provisioning از هاب.** با `SERVICE_KEY` پر، هاب با `Authorization: Bearer <SERVICE_KEY>` صدا می‌زند (بدون کلید ۴۰۴، کلید غلط ۴۰۱، هر پاسخ `X-Request-Id` دارد):
+
+- `PUT /api/service/v1/organizations/{key}` با `{tenant, kind, name, parent}`: کیف پول مال کل tenant است، پس هر tenant **یک** سازمان دارد: هلدینگ (`kind: holding`) یا شرکتِ بدون parent. شرکت‌های زیر هلدینگ و ورک‌اسپیس‌ها `202 {"ignored": true}` می‌گیرند؛ سازمانِ ریشهٔ دوم برای همان tenant `409 conflict`. با `(tenant, external_key)` idempotent است.
+- `PUT /api/service/v1/members` با `{tenant, organization, members: [{sub, email, name, role}]}`: کل اعضای آن سازمان را جایگزین می‌کند (admin←مالک، manager←توسعه‌دهنده، member و reader←عضو). کاربر ناشناس بدون رمز قابل‌استفاده ساخته می‌شود و `oidc_subject` می‌گیرد تا اولین ورود سازمانی به همان رکورد برسد. سازمان هیچ‌وقت آخرین مالکش را از دست نمی‌دهد: تا هاب admin نفرستد، مالک‌های فعلی می‌مانند. اعضای سازمان‌هایی که نادیده گرفته شده‌اند `202` و سازمان ناشناس `404` می‌گیرند.
 
 ## راه‌اندازی
 

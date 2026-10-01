@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\Api\PlaygroundController;
 use App\Http\Controllers\Api\PublisherAgentController;
 use App\Http\Controllers\Api\PublisherController;
+use App\Http\Controllers\Service\ProvisioningController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -29,7 +30,9 @@ Route::prefix('v1')->group(function () {
     Route::middleware('throttle:10,1')->group(function () {
         Route::post('auth/register', [AuthController::class, 'register']);
         Route::post('auth/login', [AuthController::class, 'login']);
+        Route::post('auth/oidc/exchange', [AuthController::class, 'oidcExchange']);
     });
+    Route::get('auth/methods', [AuthController::class, 'methods']);
 
     Route::middleware(['auth:sanctum', 'active', 'organization'])->group(function () {
         Route::get('auth/me', [AuthController::class, 'me']);
@@ -93,4 +96,13 @@ Route::prefix('v1')->group(function () {
         Route::post('notifications/read', [NotificationController::class, 'markAllRead']);
 
     });
+});
+
+/*
+| Service API the Rahap Hub provisions organizations and members with (Bearer SERVICE_KEY).
+| Answers 404 while SERVICE_KEY is empty.
+*/
+Route::prefix('service/v1')->middleware('service.key')->group(function () {
+    Route::put('organizations/{key}', [ProvisioningController::class, 'organization'])->where('key', '.+');
+    Route::put('members', [ProvisioningController::class, 'members']);
 });

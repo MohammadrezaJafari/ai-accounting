@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AuthenticateAgentRun;
 use App\Http\Middleware\AuthenticateAppKey;
+use App\Http\Middleware\AuthenticateServiceKey;
 use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\ResolveOrganization;
@@ -36,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'app.key' => AuthenticateAppKey::class,
             'agent.run' => AuthenticateAgentRun::class,
             'organization' => ResolveOrganization::class,
+            'service.key' => AuthenticateServiceKey::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

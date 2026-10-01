@@ -14,8 +14,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * A customer account (a company or a person) that owns apps and has members with roles.
  * It can also publish agents in the marketplace; `payout_details` (e.g. bank account) is encrypted.
+ * An organization provisioned by the Rahap Hub has its `tenant` and Hub key (`external_key`);
+ * there is one per tenant (the holding or the root company), since the wallet is the tenant's.
  */
-#[Fillable(['name', 'publisher_name', 'publisher_url', 'support_email', 'payout_details'])]
+#[Fillable(['tenant', 'external_key', 'name', 'publisher_name', 'publisher_url', 'support_email', 'payout_details'])]
 #[Hidden(['payout_details'])]
 class Organization extends Model
 {

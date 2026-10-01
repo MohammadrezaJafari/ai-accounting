@@ -8,6 +8,7 @@ namespace App\Support;
  * - Owner: everything, including members and the organization itself.
  * - Developer: apps, API keys (and their spend limits), the panel chat and the organization's marketplace agents.
  * - Billing: wallets, top-ups, orders, app spend limits and publisher payout details.
+ * - Member: read-only (what every member sees); the Hub's member and reader roles land here.
  *
  * Every member can see apps, usage and logs.
  */
@@ -16,6 +17,7 @@ enum OrganizationRole: string
     case Owner = 'owner';
     case Developer = 'developer';
     case Billing = 'billing';
+    case Member = 'member';
 
     public function label(): string
     {
@@ -23,6 +25,7 @@ enum OrganizationRole: string
             self::Owner => 'مالک',
             self::Developer => 'توسعه‌دهنده',
             self::Billing => 'مالی',
+            self::Member => 'عضو',
         };
     }
 
@@ -32,6 +35,7 @@ enum OrganizationRole: string
             self::Owner => true,
             self::Developer => in_array($permission, [OrganizationPermission::ManageApps, OrganizationPermission::ManageKeys, OrganizationPermission::UseChat, OrganizationPermission::PublishAgents], true),
             self::Billing => $permission === OrganizationPermission::ManageBilling,
+            self::Member => false,
         };
     }
 
