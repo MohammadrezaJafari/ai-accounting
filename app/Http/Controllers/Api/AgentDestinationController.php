@@ -114,6 +114,7 @@ class AgentDestinationController extends Controller
             ]),
             DeliveryChannel::Email => ['emails' => array_values(array_unique(array_map(fn ($email) => Str::lower(trim($email)), $input['emails'])))],
             DeliveryChannel::Webhook => ['url' => trim($input['url']), 'secret' => $current['secret'] ?? Str::random(40)],
+            DeliveryChannel::Rahap => ['url' => trim($input['url'])],
         };
     }
 

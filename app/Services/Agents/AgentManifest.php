@@ -2,10 +2,12 @@
 
 namespace App\Services\Agents;
 
+use App\Support\AgentKind;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 
 /**
@@ -56,6 +58,7 @@ class AgentManifest
             'description' => ['nullable', 'string', 'max:10000'],
             'icon' => ['nullable', 'string', 'max:50'],
             'category' => ['nullable', 'string', 'max:50'],
+            'kind' => ['nullable', Rule::enum(AgentKind::class)],
             'publisher.name' => ['nullable', 'string', 'max:255'],
             'publisher.url' => ['nullable', 'url', 'max:500'],
             'unit_name' => ['nullable', 'string', 'max:50'],
@@ -75,7 +78,7 @@ class AgentManifest
         }
 
         return array_filter([
-            ...Arr::only($manifest, ['name', 'tagline', 'description', 'icon', 'category', 'unit_name', 'max_units_per_run', 'endpoint_url']),
+            ...Arr::only($manifest, ['name', 'tagline', 'description', 'icon', 'category', 'kind', 'unit_name', 'max_units_per_run', 'endpoint_url']),
             'publisher_name' => data_get($manifest, 'publisher.name'),
             'publisher_url' => data_get($manifest, 'publisher.url'),
             'config_schema' => $schema,

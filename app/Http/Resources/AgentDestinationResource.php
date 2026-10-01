@@ -34,6 +34,10 @@ class AgentDestinationResource extends JsonResource
                     'url' => $this->setting('url'),
                     'secret' => $this->when(Gate::allows(OrganizationPermission::ManageApps->value), fn () => $this->setting('secret')),
                 ],
+                // The hook URL carries its secret, so only members who manage agents see it whole.
+                DeliveryChannel::Rahap => [
+                    'url' => Gate::allows(OrganizationPermission::ManageApps->value) ? $this->setting('url') : preg_replace('#/hooks/.*$#', '/hooks/…', (string) $this->setting('url')),
+                ],
             },
             'is_active' => $this->is_active,
             'last_delivered_at' => $this->last_delivered_at,

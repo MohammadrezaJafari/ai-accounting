@@ -130,6 +130,34 @@ class AgentDeliveryTest extends TestCase
         $this->assertNotNull($hook->refresh()->last_delivered_at);
     }
 
+    public function test_reports_reach_a_rahap_messenger_channel_through_its_incoming_webhook(): void
+    {
+        $this->fake(['chat.test/*' => Http::response('ok')]);
+        Sanctum::actingAs(User::factory()->inOrganization($this->organization, OrganizationRole::Developer)->create());
+
+        // The hook URL has to look like the messenger's (/hooks/{secret}); anything else is refused.
+        $this->postJson("/api/v1/agent-instances/{$this->monitor->id}/destinations", ['type' => 'rahap', 'settings' => ['url' => 'https://chat.test/api/v1/posts']])
+            ->assertJsonValidationErrors('settings.url');
+        $hook = $this->postJson("/api/v1/agent-instances/{$this->monitor->id}/destinations", [
+            'type' => 'rahap', 'label' => 'کانال مدیران', 'settings' => ['url' => 'https://chat.test/hooks/abcDEF123_-'],
+        ])->assertCreated()->assertJsonPath('data.type_label', 'پیام‌رسان رهاپ')->assertJsonPath('data.settings.url', 'https://chat.test/hooks/abcDEF123_-')->json('data.id');
+
+        $run = $this->runMonitor();
+
+        $this->assertSame(AgentRun::STATUS_SUCCEEDED, $run->status, (string) $run->error);
+        $this->assertSame([true], array_column($run->meta['deliveries'], 'ok'));
+        Http::assertSent(fn (ClientRequest $request) => $request->url() === 'https://chat.test/hooks/abcDEF123_-'
+            && $request['username'] === 'پایش بازار'
+            && str_starts_with($request['text'], '**پایش بازار — ')
+            && str_contains($request['text'], 'بازار **رشد** کرد'));
+
+        // Members who do not manage agents see the hook without its secret.
+        Sanctum::actingAs(User::factory()->inOrganization($this->organization, OrganizationRole::Billing)->create());
+        $this->getJson("/api/v1/agent-instances/{$this->monitor->id}/destinations")->assertOk()
+            ->assertJsonPath('data.0.settings.url', 'https://chat.test/hooks/…');
+        $this->assertSame($hook, AgentDestination::query()->sole()->id);
+    }
+
     public function test_a_failing_destination_does_not_fail_the_run(): void
     {
         $this->fake(['tg.test/*' => Http::response(['ok' => false, 'description' => 'Bad Request: chat not found'], 400)]);

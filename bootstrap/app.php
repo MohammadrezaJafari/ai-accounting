@@ -23,6 +23,9 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Behind the cluster gateway and Arvan: the scheme and host come from X-Forwarded-*.
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'admin' => EnsureAdmin::class,
             'active' => EnsureActiveUser::class,

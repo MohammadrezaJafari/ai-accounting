@@ -25,6 +25,7 @@ class AgentResource extends JsonResource
             'description' => $this->description,
             'icon' => $this->icon ?: 'smart_toy',
             'category' => $this->category,
+            'kind' => $this->kind?->value ?? 'report',
             'publisher' => $this->publisherDisplayName() ? ['name' => $this->publisherDisplayName(), 'url' => $this->publisher_organization_id ? $this->publisher?->publisher_url : $this->publisher_url] : null,
             'unit_name' => $this->unit_name,
             'max_units_per_run' => $this->max_units_per_run,

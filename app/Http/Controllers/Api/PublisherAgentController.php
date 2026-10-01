@@ -15,6 +15,7 @@ use App\Services\Agents\HttpAgent;
 use App\Services\Agents\UrlGuard;
 use App\Services\Publishers\PublisherEarnings;
 use App\Services\Publishers\PublisherService;
+use App\Support\AgentKind;
 use App\Support\AgentStatus;
 use App\Support\Money;
 use App\Support\OrganizationPermission;
@@ -203,6 +204,7 @@ class PublisherAgentController extends Controller
             'description' => ['sometimes', 'nullable', 'string', 'max:10000'],
             'icon' => ['sometimes', 'nullable', 'string', 'regex:/^[a-z0-9_]{1,50}$/'],
             'category' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'kind' => ['sometimes', Rule::enum(AgentKind::class)],
             'unit_name' => [$required, 'string', 'max:50'],
             'max_units_per_run' => ['sometimes', 'integer', 'between:1,1000'],
             'endpoint_url' => ['sometimes', 'nullable', 'url:http,https', 'max:500', $this->publicUrl()],

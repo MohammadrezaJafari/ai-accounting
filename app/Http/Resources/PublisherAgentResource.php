@@ -29,6 +29,7 @@ class PublisherAgentResource extends JsonResource
             'description' => $this->description,
             'icon' => $this->icon,
             'category' => $this->category,
+            'kind' => $this->kind?->value ?? 'report',
             'unit_name' => $this->unit_name,
             'max_units_per_run' => $this->max_units_per_run,
             'endpoint_url' => $this->endpoint_url,

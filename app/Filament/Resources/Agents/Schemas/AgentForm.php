@@ -8,6 +8,7 @@ use App\Models\AiModel;
 use App\Services\Agents\AgentRegistry;
 use App\Services\Agents\ConfigSchema;
 use App\Support\AgentDriver;
+use App\Support\AgentKind;
 use Closure;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -41,6 +42,9 @@ class AgentForm
                         ->helperText('Markdown؛ در صفحهٔ ایجنت در بازارچه نمایش داده می‌شود.'),
                     TextInput::make('category')->label('دسته')->maxLength(50)->placeholder('پایش و گزارش')
                         ->datalist(fn () => Agent::query()->whereNotNull('category')->distinct()->pluck('category')->all()),
+                    Select::make('kind')->label('نوع عامل')->options(collect(AgentKind::cases())->mapWithKeys(fn (AgentKind $kind) => [$kind->value => $kind->label()]))
+                        ->default(AgentKind::Report->value)->required()->native(false)
+                        ->helperText('گزارش زمان‌بندی‌شده خروجی‌اش را به مقصدها می‌فرستد؛ عامل تعاملی در پیام‌رسان رهاپ زندگی می‌کند و این‌جا فقط فروخته و شمرده می‌شود.'),
                     TextInput::make('icon')->label('آیکون')->maxLength(50)->placeholder('smart_toy')->extraInputAttributes(['dir' => 'ltr'])
                         ->helperText('نام یک آیکون Material Icons، مثل feed، query_stats یا support_agent.'),
                     Select::make('publisher_organization_id')->label('سازمان ناشر')->relationship('publisher', 'name')->searchable()->preload()->live()

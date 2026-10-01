@@ -89,6 +89,7 @@ class ReportDelivery
             DeliveryChannel::Bale => $this->messenger($destination, $this->formatter->plain($title, $markdown)),
             DeliveryChannel::Email => $this->email($destination, $title, $markdown),
             DeliveryChannel::Webhook => $this->webhook($destination, $payload + ['title' => $title, 'report' => $markdown]),
+            DeliveryChannel::Rahap => $this->rahap($destination, $title, $markdown),
         };
     }
 
@@ -155,6 +156,32 @@ class ReportDelivery
 
         if (! $response->successful()) {
             throw new AgentException("وب‌هوک پاسخ {$response->status()} داد.");
+        }
+    }
+
+    /**
+     * The Rahap messenger renders Markdown itself, so the report goes as one message with the
+     * title in bold, Slack-style (`{text}`), to the channel's incoming webhook. The hook secret is
+     * in the URL; that is how the messenger authenticates it.
+     */
+    private function rahap(AgentDestination $destination, string $title, string $markdown): void
+    {
+        $url = (string) $destination->setting('url');
+        $this->guard->assertPublic($url);
+
+        $response = Http::timeout(15)
+            ->withOptions(['allow_redirects' => false])
+            ->asJson()
+            ->post($url, [
+                'text' => "**{$title}**\n\n{$markdown}",
+                'username' => $destination->instance->name,
+            ]);
+
+        if (! $response->successful()) {
+            throw new AgentException(match ($response->status()) {
+                404 => 'وب‌هوک در پیام‌رسان پیدا نشد؛ شاید حذف یا دوباره ساخته شده است.',
+                default => "پیام‌رسان رهاپ پاسخ {$response->status()} داد.",
+            });
         }
     }
 

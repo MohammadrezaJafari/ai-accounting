@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\AgentDriver;
+use App\Support\AgentKind;
 use App\Support\AgentStatus;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -27,7 +28,7 @@ use Illuminate\Support\Str;
  * the model calls and sets `max_cost_per_run` itself, up to `costCeiling()`.
  */
 #[Fillable([
-    'publisher_organization_id', 'slug', 'status', 'pending_changes', 'review_note', 'submitted_at', 'reviewed_at', 'driver', 'endpoint_url', 'timeout_seconds', 'run_deadline_minutes', 'config_schema',
+    'publisher_organization_id', 'slug', 'kind', 'status', 'pending_changes', 'review_note', 'submitted_at', 'reviewed_at', 'driver', 'endpoint_url', 'timeout_seconds', 'run_deadline_minutes', 'config_schema',
     'name', 'tagline', 'icon', 'category', 'publisher_name', 'publisher_url', 'revenue_share',
     'description', 'unit_name', 'max_units_per_run', 'model', 'allowed_models', 'max_cost_per_run', 'max_cost_ceiling', 'is_active', 'sort_order',
 ])]
@@ -38,11 +39,11 @@ class Agent extends Model
 
     /** Fields a publisher may change; `packages` is handled alongside them. */
     public const PUBLISHER_FIELDS = [
-        'name', 'tagline', 'description', 'icon', 'category', 'unit_name', 'max_units_per_run',
+        'name', 'tagline', 'description', 'icon', 'category', 'kind', 'unit_name', 'max_units_per_run',
         'endpoint_url', 'timeout_seconds', 'run_deadline_minutes', 'config_schema',
     ];
 
-    protected $attributes = ['driver' => 'http', 'status' => 'approved', 'max_units_per_run' => 1, 'timeout_seconds' => 60, 'run_deadline_minutes' => 15];
+    protected $attributes = ['driver' => 'http', 'kind' => 'report', 'status' => 'approved', 'max_units_per_run' => 1, 'timeout_seconds' => 60, 'run_deadline_minutes' => 15];
 
     protected static function booted(): void
     {
@@ -60,6 +61,7 @@ class Agent extends Model
     {
         return [
             'driver' => AgentDriver::class,
+            'kind' => AgentKind::class,
             'status' => AgentStatus::class,
             'pending_changes' => 'array',
             'submitted_at' => 'datetime',

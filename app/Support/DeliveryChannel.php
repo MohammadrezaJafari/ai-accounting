@@ -11,6 +11,8 @@ enum DeliveryChannel: string
     case Bale = 'bale';
     case Email = 'email';
     case Webhook = 'webhook';
+    /** A channel of the Rahap messenger, through its incoming webhook (POST /hooks/{secret}). */
+    case Rahap = 'rahap';
 
     public function label(): string
     {
@@ -19,6 +21,7 @@ enum DeliveryChannel: string
             self::Bale => 'بله',
             self::Email => 'ایمیل',
             self::Webhook => 'وب‌هوک',
+            self::Rahap => 'پیام‌رسان رهاپ',
         };
     }
 
@@ -40,6 +43,9 @@ enum DeliveryChannel: string
             ],
             self::Webhook => [
                 'url' => ['required', 'url:https,http', 'max:500'],
+            ],
+            self::Rahap => [
+                'url' => ['required', 'url:https,http', 'max:500', 'regex:#/hooks/[A-Za-z0-9_-]+$#'],
             ],
         };
     }
