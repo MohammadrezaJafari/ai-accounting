@@ -26,6 +26,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Behind the cluster gateway and Arvan: the scheme and host come from X-Forwarded-*.
         $middleware->trustProxies(at: '*');
 
+        // The APIs have no login page to send a guest to: a client without `Accept:
+        // application/json` used to get a 500 (route [login] not defined) instead of 401.
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*', 'v1/*', 'agent-api/*') ? null : '/admin/login');
+
         $middleware->alias([
             'admin' => EnsureAdmin::class,
             'active' => EnsureActiveUser::class,

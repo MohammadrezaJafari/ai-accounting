@@ -16,6 +16,12 @@ class BillingApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_a_guest_without_a_json_accept_header_gets_401_not_a_login_redirect(): void
+    {
+        $this->get('/api/v1/catalog/models')->assertStatus(401)->assertJsonPath('message', 'Unauthenticated.');
+        $this->get('/api/v1/agents')->assertStatus(401);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
