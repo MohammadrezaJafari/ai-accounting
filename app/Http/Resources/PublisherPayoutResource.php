@@ -12,6 +12,8 @@ class PublisherPayoutResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'type' => $this->type,
+            'app' => $this->whenLoaded('app', fn () => $this->app ? ['id' => $this->app->id, 'name' => $this->app->name] : null),
             'amount' => Money::toUsd($this->amount),
             'reference' => $this->reference,
             'note' => $this->note,

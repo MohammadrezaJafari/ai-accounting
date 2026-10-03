@@ -30,7 +30,10 @@ class AgentResource extends JsonResource
             'unit_name' => $this->unit_name,
             'max_units_per_run' => $this->max_units_per_run,
             'config_schema' => ConfigSchema::for($this->resource)->fields(),
+            'run_input_label' => $this->run_input_label,
             'credits' => (int) ($this->credits ?? 0),
+            'free_trial_units' => $this->free_trial_units,
+            'trial_available' => (bool) ($this->trial_available ?? false),
             'packages' => $this->whenLoaded('packages', fn () => $this->packages->map(fn (AgentPackage $package) => [
                 'id' => $package->id,
                 'name' => $package->name,

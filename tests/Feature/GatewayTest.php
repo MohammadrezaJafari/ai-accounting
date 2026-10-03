@@ -175,4 +175,31 @@ class GatewayTest extends TestCase
 
         $this->withToken($plain)->getJson('/v1/models')->assertStatus(402);
     }
+
+    public function test_each_key_is_rate_limited_per_minute(): void
+    {
+        config(['billing.gateway_rate_limit.per_minute' => 2]);
+
+        $this->withToken($this->key)->getJson('/v1/models')->assertOk()
+            ->assertHeader('x-ratelimit-limit-requests', '2')
+            ->assertHeader('x-ratelimit-remaining-requests', '1');
+        $this->withToken($this->key)->getJson('/v1/models')->assertOk();
+        $this->withToken($this->key)->getJson('/v1/models')->assertStatus(429)
+            ->assertHeader('Retry-After')
+            ->assertJsonPath('error.type', 'rate_limit_error');
+
+        // Another key of the same app has its own allowance, and a key may set its own limit.
+        [, $other] = app(ApiKeyService::class)->create($this->clientApp, ['name' => 'batch', 'rate_limit_per_minute' => 5]);
+        $this->withToken($other)->getJson('/v1/models')->assertOk()->assertHeader('x-ratelimit-limit-requests', '5');
+
+        $this->travel(61)->seconds();
+        $this->withToken($this->key)->getJson('/v1/models')->assertOk();
+    }
+
+    public function test_a_platform_limit_of_zero_means_unlimited(): void
+    {
+        config(['billing.gateway_rate_limit.per_minute' => 0]);
+
+        $this->withToken($this->key)->getJson('/v1/models')->assertOk()->assertHeaderMissing('x-ratelimit-limit-requests');
+    }
 }

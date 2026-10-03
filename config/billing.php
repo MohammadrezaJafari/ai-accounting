@@ -31,6 +31,13 @@ return [
 
     'upstream_timeout' => (int) env('GATEWAY_UPSTREAM_TIMEOUT', 600),
 
+    // Gateway requests per minute per API key, unless the key sets its own (0 = unlimited).
+    // Customers may set their keys up to `max_per_minute`; the admin may set any value.
+    'gateway_rate_limit' => [
+        'per_minute' => (int) env('GATEWAY_RATE_LIMIT_PER_MINUTE', 60),
+        'max_per_minute' => (int) env('GATEWAY_RATE_LIMIT_MAX_PER_MINUTE', 600),
+    ],
+
     // Marketplace agents made by publisher organizations: the publisher's default percent of
     // the revenue, the default cap on one run's model spend (USD) and test runs per agent per day.
     'publishers' => [
@@ -41,6 +48,13 @@ return [
         // How far below zero a publisher's balance may go (model costs of its runs) before its test runs stop.
         'test_run_debt_limit_usd' => env('PUBLISHER_TEST_RUN_DEBT_LIMIT_USD', '5.00'),
         'test_runs_per_day' => (int) env('PUBLISHER_TEST_RUNS_PER_DAY', 30),
+        // Most free trial units a publisher may give each organization (it pays their model cost).
+        'max_free_trial_units' => (int) env('PUBLISHER_MAX_FREE_TRIAL_UNITS', 10),
+        // The platform settles a publisher's balance once it reaches this amount.
+        'payout_min_usd' => env('PUBLISHER_PAYOUT_MIN_USD', '10'),
+        // Limits of one deposit a publisher makes from an app wallet to cover its debt.
+        'deposit_min_usd' => env('PUBLISHER_DEPOSIT_MIN_USD', '1'),
+        'deposit_max_usd' => env('PUBLISHER_DEPOSIT_MAX_USD', '1000'),
         // Only for developing agents locally: lets publisher services run on private addresses.
         'allow_private_endpoints' => (bool) env('PUBLISHER_ALLOW_PRIVATE_ENDPOINTS', false),
     ],

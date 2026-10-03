@@ -18,6 +18,9 @@ class WalletTransaction extends Model
 
     public const TYPE_REFUND = 'refund';
 
+    /** Moved to the organization's publisher balance to cover its agents' model costs. */
+    public const TYPE_PUBLISHER_DEPOSIT = 'publisher_deposit';
+
     protected function casts(): array
     {
         return [

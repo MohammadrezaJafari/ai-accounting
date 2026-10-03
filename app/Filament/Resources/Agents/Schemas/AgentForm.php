@@ -89,6 +89,8 @@ class AgentForm
                     TextInput::make('unit_name')->label('نام واحد فروش')->required()->maxLength(50)->placeholder('گزارش'),
                     TextInput::make('max_units_per_run')->label('حداکثر واحد در هر اجرا')->numeric()->minValue(1)->maxValue(1000)->default(1)->required()
                         ->helperText('ایجنت می‌تواند بگوید خروجی‌اش چند واحد می‌ارزد (مثلاً به ازای هر مورد پیدا شده)، تا این سقف.'),
+                    TextInput::make('free_trial_units')->label('واحد آزمایش رایگان')->numeric()->minValue(0)->maxValue(1000)->default(0)->required()
+                        ->helperText('هر سازمان یک بار می‌تواند این تعداد واحد را رایگان بگیرد. سهم ناشر از این واحدها صفر است و هزینهٔ مدلشان با ناشر است.'),
                     TextInput::make('revenue_share')->label('سهم ناشر')->numeric()->minValue(0)->maxValue(100)->default(0)->suffix('٪')
                         ->helperText('درصدی از درآمد که به ناشر ایجنت بدهکاریم. برای ناشرِ عضو پلتفرم، هزینهٔ مدل اجراها از این سهم کم می‌شود.'),
                     Select::make('model')->label('مدل پیش‌فرض')->searchable()
@@ -107,6 +109,9 @@ class AgentForm
                 Section::make('پارامترهای مشتری')->columnSpanFull()
                     ->description('فرمی که مشتری هنگام ساخت ایجنت پر می‌کند؛ مقدارها در config هر اجرا به سرویس فرستاده می‌شوند.')
                     ->schema([
+                        TextInput::make('run_input_label')->label('ورودی هر اجرای دستی')->maxLength(100)
+                            ->placeholder('مثلاً: لینکی که باید خلاصه شود')
+                            ->helperText('اگر پر شود، مشتری در هر اجرای دستی این را وارد می‌کند و در input اجرا به سرویس می‌رسد.'),
                         Repeater::make('config_schema')->hiddenLabel()->columns(4)->collapsible()->collapsed()->reorderable()
                             ->addActionLabel('افزودن پارامتر')
                             ->itemLabel(fn (array $state) => trim(($state['label'] ?? '').' ('.($state['key'] ?? '?').' — '.(ConfigSchema::TYPES[$state['type'] ?? ''] ?? '').')'))

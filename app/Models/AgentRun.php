@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
  * An HTTP agent gets a token for the run (stored hashed) to call our models and post its
  * result until `deadline_at`; `data` is the structured output it returned, if any.
  */
-#[Fillable(['agent_instance_id', 'agent_id', 'organization_id', 'status', 'trigger', 'units', 'revenue', 'publisher_share', 'publisher_cost', 'cost', 'items_found', 'report', 'data', 'error', 'meta', 'started_at', 'deadline_at', 'finished_at'])]
+#[Fillable(['agent_instance_id', 'agent_id', 'organization_id', 'status', 'trigger', 'input', 'units', 'revenue', 'publisher_share', 'publisher_cost', 'cost', 'items_found', 'report', 'data', 'error', 'meta', 'started_at', 'deadline_at', 'finished_at'])]
 #[Hidden(['token_hash'])]
 class AgentRun extends Model
 {

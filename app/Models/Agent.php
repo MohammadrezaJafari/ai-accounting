@@ -28,9 +28,9 @@ use Illuminate\Support\Str;
  * the model calls and sets `max_cost_per_run` itself, up to `costCeiling()`.
  */
 #[Fillable([
-    'publisher_organization_id', 'slug', 'kind', 'status', 'pending_changes', 'review_note', 'submitted_at', 'reviewed_at', 'driver', 'endpoint_url', 'timeout_seconds', 'run_deadline_minutes', 'config_schema',
+    'publisher_organization_id', 'slug', 'kind', 'status', 'pending_changes', 'review_note', 'submitted_at', 'reviewed_at', 'driver', 'endpoint_url', 'timeout_seconds', 'run_deadline_minutes', 'config_schema', 'run_input_label',
     'name', 'tagline', 'icon', 'category', 'publisher_name', 'publisher_url', 'revenue_share',
-    'description', 'unit_name', 'max_units_per_run', 'model', 'allowed_models', 'max_cost_per_run', 'max_cost_ceiling', 'is_active', 'sort_order',
+    'description', 'unit_name', 'max_units_per_run', 'free_trial_units', 'model', 'allowed_models', 'max_cost_per_run', 'max_cost_ceiling', 'is_active', 'sort_order',
 ])]
 #[Hidden(['signing_secret'])]
 class Agent extends Model
@@ -39,8 +39,8 @@ class Agent extends Model
 
     /** Fields a publisher may change; `packages` is handled alongside them. */
     public const PUBLISHER_FIELDS = [
-        'name', 'tagline', 'description', 'icon', 'category', 'kind', 'unit_name', 'max_units_per_run',
-        'endpoint_url', 'timeout_seconds', 'run_deadline_minutes', 'config_schema',
+        'name', 'tagline', 'description', 'icon', 'category', 'kind', 'unit_name', 'max_units_per_run', 'free_trial_units',
+        'endpoint_url', 'timeout_seconds', 'run_deadline_minutes', 'config_schema', 'run_input_label',
     ];
 
     protected $attributes = ['driver' => 'http', 'kind' => 'report', 'status' => 'approved', 'max_units_per_run' => 1, 'timeout_seconds' => 60, 'run_deadline_minutes' => 15];

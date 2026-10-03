@@ -110,8 +110,8 @@ class EditAgent extends EditRecord
     {
         $labels = [
             'name' => 'نام', 'tagline' => 'معرفی یک‌خطی', 'description' => 'توضیح', 'icon' => 'آیکون', 'category' => 'دسته',
-            'unit_name' => 'واحد فروش', 'max_units_per_run' => 'حداکثر واحد در هر اجرا', 'endpoint_url' => 'آدرس سرویس',
-            'timeout_seconds' => 'مهلت پاسخ', 'run_deadline_minutes' => 'مهلت نتیجه', 'config_schema' => 'پارامترها', 'packages' => 'بسته‌ها',
+            'unit_name' => 'واحد فروش', 'max_units_per_run' => 'حداکثر واحد در هر اجرا', 'free_trial_units' => 'واحد آزمایش رایگان', 'endpoint_url' => 'آدرس سرویس',
+            'timeout_seconds' => 'مهلت پاسخ', 'run_deadline_minutes' => 'مهلت نتیجه', 'config_schema' => 'پارامترها', 'run_input_label' => 'ورودی هر اجرا', 'packages' => 'بسته‌ها',
         ];
         $show = fn (mixed $value) => e(is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) : (string) $value);
         $rows = collect($agent->pending_changes ?? [])->map(fn (mixed $value, string $key) => sprintf(

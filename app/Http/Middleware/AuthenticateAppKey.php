@@ -7,6 +7,7 @@ use App\Services\Gateway\GatewayError;
 use App\Services\SettingsService;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -43,8 +44,29 @@ class AuthenticateAppKey
             return GatewayError::response($request, 402, 'Insufficient balance. Please top up your app.', 'billing_error');
         }
 
+        $limit = $key->rateLimitPerMinute();
+        $limiterKey = "gateway-key:{$key->id}";
+
+        if ($limit > 0 && ! RateLimiter::attempt($limiterKey, $limit, fn () => true, 60)) {
+            $retryAfter = RateLimiter::availableIn($limiterKey);
+            $response = GatewayError::response($request, 429, "Rate limit reached: this API key allows {$limit} requests per minute. Retry in {$retryAfter}s.", 'rate_limit_error');
+            $response->headers->set('Retry-After', (string) $retryAfter);
+
+            return $this->withRateLimitHeaders($response, $limit, 0);
+        }
+
         $request->attributes->set('app_key', $key);
 
-        return $next($request);
+        $response = $next($request);
+
+        return $limit > 0 ? $this->withRateLimitHeaders($response, $limit, RateLimiter::remaining($limiterKey, $limit)) : $response;
+    }
+
+    private function withRateLimitHeaders(Response $response, int $limit, int $remaining): Response
+    {
+        $response->headers->set('x-ratelimit-limit-requests', (string) $limit);
+        $response->headers->set('x-ratelimit-remaining-requests', (string) $remaining);
+
+        return $response;
     }
 }

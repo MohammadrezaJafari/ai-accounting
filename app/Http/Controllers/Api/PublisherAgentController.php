@@ -106,9 +106,9 @@ class PublisherAgentController extends Controller
     {
         $agent = $this->owned($request, $agent);
         $schema = $this->publishers->testSchema($agent);
-        $data = $request->validate($schema->rules(), attributes: $schema->attributes());
+        $data = $request->validate([...$schema->rules(), 'input' => ['nullable', 'string', 'max:4000']], attributes: $schema->attributes());
 
-        $run = $this->publishers->startTestRun($agent, $schema->normalize($data['config'] ?? []), $request->user());
+        $run = $this->publishers->startTestRun($agent, $schema->normalize($data['config'] ?? []), $request->user(), $data['input'] ?? null);
         RunAgent::dispatchAfterResponse($run);
 
         return (new AgentRunResource($run))->response()->setStatusCode(202);
@@ -163,6 +163,7 @@ class PublisherAgentController extends Controller
             'id' => $run->id,
             'status' => $run->status,
             'trigger' => $run->trigger,
+            'input' => $run->isTest() ? $run->input : null,
             'units' => $run->units,
             'items_found' => $run->items_found,
             'error' => $run->error,
@@ -207,15 +208,17 @@ class PublisherAgentController extends Controller
             'kind' => ['sometimes', Rule::enum(AgentKind::class)],
             'unit_name' => [$required, 'string', 'max:50'],
             'max_units_per_run' => ['sometimes', 'integer', 'between:1,1000'],
+            'free_trial_units' => ['sometimes', 'integer', 'between:0,'.config('billing.publishers.max_free_trial_units')],
             'endpoint_url' => ['sometimes', 'nullable', 'url:http,https', 'max:500', $this->publicUrl()],
             'timeout_seconds' => ['sometimes', 'integer', 'between:5,300'],
             'run_deadline_minutes' => ['sometimes', 'integer', 'between:1,720'],
             'config_schema' => ['sometimes', 'array', 'max:50', $this->validSchema()],
+            'run_input_label' => ['sometimes', 'nullable', 'string', 'max:100'],
             'packages' => [$agent ? 'sometimes' : 'nullable', 'array', 'max:6'],
             'packages.*.units' => ['required', 'integer', 'between:1,100000', 'distinct'],
             'packages.*.price' => ['required', 'numeric', 'between:0.5,10000'],
             'max_cost_per_run' => ['sometimes', 'numeric', 'min:0.01', 'max:'.Money::toUsd($agent?->costCeiling() ?? (new Agent)->costCeiling())],
-        ], attributes: ['packages.*.units' => 'تعداد واحد', 'packages.*.price' => 'قیمت', 'max_cost_per_run' => 'سقف هزینهٔ مدل هر اجرا']);
+        ], attributes: ['packages.*.units' => 'تعداد واحد', 'packages.*.price' => 'قیمت', 'max_cost_per_run' => 'سقف هزینهٔ مدل هر اجرا', 'free_trial_units' => 'واحد آزمایش رایگان']);
 
         if (array_key_exists('max_cost_per_run', $data)) {
             $data['max_cost_per_run'] = Money::fromUsd((string) $data['max_cost_per_run']);

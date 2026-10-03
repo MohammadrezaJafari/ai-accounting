@@ -200,7 +200,7 @@ class PublisherService
      *
      * @param  array<string, mixed>  $config
      */
-    public function startTestRun(Agent $agent, array $config, User $by): AgentRun
+    public function startTestRun(Agent $agent, array $config, User $by, ?string $input = null): AgentRun
     {
         if ($this->earnings->testRunsBlocked($agent->publisher)) {
             $limit = Money::format(Money::fromUsd(config('billing.publishers.test_run_debt_limit_usd')));
@@ -227,7 +227,7 @@ class PublisherService
             'created_by' => $by->id,
         ])->save();
 
-        return $this->runner->start($instance, AgentRun::TRIGGER_TEST);
+        return $this->runner->start($instance, AgentRun::TRIGGER_TEST, $input);
     }
 
     /**

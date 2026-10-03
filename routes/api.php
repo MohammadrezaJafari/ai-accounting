@@ -71,6 +71,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('agents', [AgentController::class, 'index']);
         Route::post('agents/{agent}/purchase', [AgentController::class, 'purchase']);
+        Route::post('agents/{agent}/trial', [AgentController::class, 'trial'])->middleware('throttle:10,1');
         Route::apiResource('agent-instances', AgentInstanceController::class)->parameters(['agent-instances' => 'agentInstance']);
         Route::post('agent-instances/{agentInstance}/run', [AgentInstanceController::class, 'run'])->middleware('throttle:20,1');
         Route::get('agent-instances/{agentInstance}/runs', [AgentInstanceController::class, 'runs']);
@@ -83,6 +84,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('publisher', [PublisherController::class, 'show']);
         Route::patch('publisher', [PublisherController::class, 'update']);
+        Route::post('publisher/deposits', [PublisherController::class, 'deposit'])->middleware('throttle:10,1');
         Route::post('publisher/manifest', [PublisherAgentController::class, 'importManifest'])->middleware('throttle:10,1');
         Route::apiResource('publisher/agents', PublisherAgentController::class)->parameters(['agents' => 'agent'])->names('publisher.agents');
         Route::post('publisher/agents/{agent}/submit', [PublisherAgentController::class, 'submit']);

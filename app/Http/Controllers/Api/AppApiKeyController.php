@@ -82,6 +82,7 @@ class AppApiKeyController extends Controller
             'allowed_models.*' => ['string', 'exists:ai_models,public_id'],
             'spend_limit' => ['nullable', 'numeric', 'min:0'],
             'spend_limit_period' => ['sometimes', Rule::enum(BudgetPeriod::class)],
+            'rate_limit_per_minute' => ['nullable', 'integer', 'min:1', 'max:'.config('billing.gateway_rate_limit.max_per_minute')],
             'expires_at' => ['nullable', 'date'],
             'is_active' => ['sometimes', 'boolean'],
         ]);

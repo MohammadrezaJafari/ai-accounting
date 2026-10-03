@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\AgentResource;
 use App\Models\Agent;
 use App\Models\AgentCredit;
+use App\Models\AgentCreditTransaction;
 use App\Models\App;
 use App\Services\Agents\AgentCreditService;
 use App\Support\Money;
@@ -24,17 +25,34 @@ class AgentController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $credits = AgentCredit::query()->where('organization_id', $this->organization($request)->id)->pluck('units', 'agent_id');
+        $organization = $this->organization($request);
+        $credits = AgentCredit::query()->where('organization_id', $organization->id)->pluck('units', 'agent_id');
+        $trialsClaimed = AgentCreditTransaction::query()->where('organization_id', $organization->id)
+            ->where('type', AgentCreditTransaction::TYPE_TRIAL)->pluck('agent_id')->flip();
 
         $agents = Agent::query()->active()->with('publisher')->orderBy('sort_order')
             ->with(['packages' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')])
             ->get()
-            ->each(fn (Agent $agent) => $agent->setAttribute('credits', $credits[$agent->id] ?? 0));
+            ->each(fn (Agent $agent) => $agent->setAttribute('credits', $credits[$agent->id] ?? 0)
+                ->setAttribute('trial_available', $agent->free_trial_units > 0 && ! $trialsClaimed->has($agent->id)));
 
         return AgentResource::collection($agents)->additional(['delivery' => [
             'telegram_bot' => config('services.telegram.bot_username'),
             'bale_bot' => config('services.bale.bot_username'),
         ]]);
+    }
+
+    /**
+     * Claim the agent's free trial units, once per organization.
+     */
+    public function trial(Request $request, Agent $agent, AgentCreditService $credits): JsonResponse
+    {
+        $this->authorizeTo(OrganizationPermission::ManageApps);
+        abort_unless(Agent::query()->active()->whereKey($agent->id)->exists(), 404);
+
+        $credit = $credits->claimTrial($this->organization($request), $agent, $request->user());
+
+        return response()->json(['credits' => $credit->units]);
     }
 
     /**

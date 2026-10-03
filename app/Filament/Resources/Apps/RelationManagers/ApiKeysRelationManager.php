@@ -46,6 +46,8 @@ class ApiKeysRelationManager extends RelationManager
                     ->options(fn () => Provider::query()->pluck('name', 'slug'))->placeholder('همه'),
                 Select::make('allowed_models')->label('فقط این مدل‌ها')->multiple()->searchable()
                     ->options(fn () => AiModel::query()->orderBy('public_id')->pluck('public_id', 'public_id'))->placeholder('همه'),
+                TextInput::make('rate_limit_per_minute')->label('سقف درخواست در دقیقه')->integer()->minValue(1)
+                    ->placeholder(fn () => 'پیش‌فرض پلتفرم: '.(config('billing.gateway_rate_limit.per_minute') ?: 'نامحدود')),
                 DateTimePicker::make('expires_at')->label('انقضا')->jalali(),
                 Toggle::make('is_active')->label('فعال')->default(true),
             ]);
@@ -67,6 +69,9 @@ class ApiKeysRelationManager extends RelationManager
                     ->formatStateUsing(fn (AppApiKey $record) => Money::format($record->spentThisPeriod()).' / '.Money::format($record->spend_limit).' '.$record->spend_limit_period->label())
                     ->color(fn (AppApiKey $record) => $record->isOverSpendLimit() ? 'danger' : null)
                     ->extraAttributes(['dir' => 'ltr']),
+                TextColumn::make('rate_limit_per_minute')->label('درخواست در دقیقه')
+                    ->state(fn (AppApiKey $record) => $record->rateLimitPerMinute() ?: 'نامحدود')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('last_used_at')->label('آخرین استفاده')->jalaliDateTime()->placeholder('—'),
                 TextColumn::make('expires_at')->label('انقضا')->jalaliDateTime()->placeholder('—')->toggleable(isToggledHiddenByDefault: true),
                 ToggleColumn::make('is_active')->label('فعال'),

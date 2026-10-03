@@ -29,6 +29,7 @@ class TransactionsRelationManager extends RelationManager
                 TextColumn::make('type')->label('نوع')->badge()->formatStateUsing(fn (string $state) => match ($state) {
                     WalletTransaction::TYPE_TOPUP => 'شارژ',
                     WalletTransaction::TYPE_REFUND => 'بازپرداخت',
+                    WalletTransaction::TYPE_PUBLISHER_DEPOSIT => 'جبران بدهی ناشر',
                     default => 'اصلاح دستی',
                 }),
                 Fields::usdColumn('amount')->label('مبلغ')->color(fn ($state) => $state < 0 ? 'danger' : 'success'),

@@ -13,7 +13,7 @@ use InvalidArgumentException;
 /**
  * A publisher describes its agent in a JSON manifest so the listing does not have to be typed
  * in by hand: name, tagline, description, icon, category, publisher {name, url}, unit_name,
- * max_units_per_run, endpoint_url and config_schema (see ConfigSchema).
+ * max_units_per_run, run_input_label, endpoint_url and config_schema (see ConfigSchema).
  */
 class AgentManifest
 {
@@ -63,6 +63,7 @@ class AgentManifest
             'publisher.url' => ['nullable', 'url', 'max:500'],
             'unit_name' => ['nullable', 'string', 'max:50'],
             'max_units_per_run' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'run_input_label' => ['nullable', 'string', 'max:100'],
             'endpoint_url' => ['nullable', 'url:http,https', 'max:500'],
             'config_schema' => ['nullable', 'array', 'max:50'],
         ]);
@@ -78,7 +79,7 @@ class AgentManifest
         }
 
         return array_filter([
-            ...Arr::only($manifest, ['name', 'tagline', 'description', 'icon', 'category', 'kind', 'unit_name', 'max_units_per_run', 'endpoint_url']),
+            ...Arr::only($manifest, ['name', 'tagline', 'description', 'icon', 'category', 'kind', 'unit_name', 'max_units_per_run', 'run_input_label', 'endpoint_url']),
             'publisher_name' => data_get($manifest, 'publisher.name'),
             'publisher_url' => data_get($manifest, 'publisher.url'),
             'config_schema' => $schema,

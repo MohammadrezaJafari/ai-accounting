@@ -22,6 +22,8 @@ class AppApiKeyResource extends JsonResource
             'spend_limit_period' => $this->spend_limit_period,
             'spent_this_period' => Money::toUsd($this->spentThisPeriod()),
             'period_ends_at' => $this->spend_limit_period->endsAt(),
+            'rate_limit_per_minute' => $this->rate_limit_per_minute,
+            'effective_rate_limit_per_minute' => $this->rateLimitPerMinute(),
             'spent' => Money::toUsd($this->spent),
             'expires_at' => $this->expires_at,
             'last_used_at' => $this->last_used_at,

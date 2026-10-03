@@ -53,6 +53,7 @@ client.messages.create(model="claude-sonnet-4-5", max_tokens=1024, messages=[{"r
 | `POST /v1/messages` | قالب Anthropic، با پشتیبانی از stream (فقط ارائه‌دهنده‌ای که `native_format = anthropic` دارد) |
 
 - اگر موجودی اپ صفر یا کمتر از حداقل باشد، خطای `402` برمی‌گردد.
+- هر کلید سقف **درخواست در دقیقه** دارد: مقدار خود کلید (`rate_limit_per_minute`) یا پیش‌فرض پلتفرم (`GATEWAY_RATE_LIMIT_PER_MINUTE`، ۶۰؛ صفر یعنی نامحدود). مشتری می‌تواند تا `GATEWAY_RATE_LIMIT_MAX_PER_MINUTE` تعیین کند و ادمین هر مقداری. با پر شدن سقف، خطای `429` (`rate_limit_error`) با هدر `Retry-After` برمی‌گردد. هدرهای `x-ratelimit-limit-requests` و `x-ratelimit-remaining-requests` هم در هر پاسخ هستند.
 - در حالت stream، گزینهٔ `stream_options.include_usage` خودکار فعال می‌شود تا مصرف قابل محاسبه باشد.
 - اگر ارائه‌دهنده گزارش مصرف نفرستد (مثلاً چون کلاینت وسط کار قطع شده)، مصرف تخمین زده می‌شود (حدود ۴ کاراکتر برای هر توکن) و در لاگ علامت می‌خورد.
 
@@ -78,11 +79,12 @@ client.messages.create(model="claude-sonnet-4-5", max_tokens=1024, messages=[{"r
 | GET/POST/DELETE | `organization/invitations[/{id}]` | دعوت‌های در انتظار |
 | GET/POST | `invitations/{token}`, `invitations/{token}/accept` | صفحهٔ پذیرش دعوت |
 | GET/POST | `notifications`, `notifications/read` | اعلان‌های هشدار سقف هزینه |
-| GET/POST | `agents`, `agents/{id}/purchase` | ایجنت‌های بازارچه با بسته‌ها، پارامترها (`config_schema`) و واحدهای باقی‌ماندهٔ سازمان. خرید بسته: `{package_id, app_id}` |
+| GET/POST | `agents`, `agents/{id}/purchase`, `agents/{id}/trial` | ایجنت‌های بازارچه با بسته‌ها، پارامترها (`config_schema`) و واحدهای باقی‌ماندهٔ سازمان. خرید بسته: `{package_id, app_id}`. `trial` واحدهای آزمایش رایگان را یک بار به سازمان می‌دهد |
 | CRUD | `agent-instances` | ایجنت‌های پیکربندی‌شدهٔ سازمان: `{agent_id, app_id, name, config, run_hours, run_days, notify_empty}`. `config` با `config_schema` ایجنت بررسی می‌شود |
-| POST/GET | `agent-instances/{id}/run`, `agent-instances/{id}/runs`, `agent-runs/{id}` | اجرای دستی، اجراها و متن گزارش |
+| POST/GET | `agent-instances/{id}/run`, `agent-instances/{id}/runs`, `agent-runs/{id}` | اجرای دستی (`{input}` اگر ایجنت `run_input_label` دارد)، اجراها و متن گزارش |
 | GET/POST/PATCH/DELETE | `agent-instances/{id}/destinations`, `agent-destinations/{id}[/test]` | مقصدهای ارسال و ارسال آزمایشی |
 | GET/PATCH | `publisher` | پروفایل ناشر، خلاصهٔ درآمد، نمودار روزانه و تسویه‌ها |
+| POST | `publisher/deposits` | جبران بدهی ناشر از کیف پول یکی از اپ‌های سازمان: `{app_id, amount}` (دسترسی `manage-billing`) |
 | CRUD | `publisher/agents` | ایجنت‌های سازمان به‌عنوان ناشر. همچنین `…/{id}/submit`، `…/{id}/ping`، `…/{id}/rotate-secret`، `…/{id}/test-runs`، `…/{id}/runs[/{run}]` و `publisher/manifest` |
 
 همهٔ مبالغ در API رشتهٔ دلاری‌اند (مثل `"12.50"`) و درصدها عدد هستند.
@@ -127,6 +129,8 @@ client.messages.create(model="claude-sonnet-4-5", max_tokens=1024, messages=[{"r
 - درخواست‌های مدلِ هر اجرا با **هزینهٔ واقعی و مبلغ دریافتی صفر** در `usage_logs` ثبت می‌شوند و به همان اجرا (`agent_run_id`) وصل‌اند. **سقف هزینهٔ هر اجرا** جلوی واحدهای زیان‌ده را می‌گیرد.
 - در پنل ادمین برای هر ایجنت درآمد، هزینه، سهم ناشر، سود، میانگین هزینهٔ هر واحد و هزینه‌ای که ۹۵٪ واحدها کمتر از آن هستند نمایش داده می‌شود.
 
+**ورودی هر اجرا** (`run_input_label`، اختیاری): اگر ایجنت آن را داشته باشد (مثلاً «لینکی که باید خلاصه شود»)، مشتری در هر اجرای دستی متنی وارد می‌کند که در فیلد `input` درخواست اجرا به سرویس می‌رسد. اجراهای زمان‌بندی‌شده `input` ندارند.
+
 **پارامترهای ایجنت** (`config_schema`): فهرستی از فیلدها با `key`، `label`، `type`، `required`، `section`، `hint`، `placeholder`، `default` و بسته به نوع `options`، `min`/`max` یا `max_items`. نوع‌ها: `text`، `textarea`، `number`، `select`، `multiselect`، `tags`، `url`، `url_list`، `toggle` و `secret`. فرم پنل مشتری از همین تعریف ساخته می‌شود. مقدار فیلدهای `secret` (مثلاً کلید API سرویس مشتری) به ایجنت فرستاده می‌شود ولی هیچ‌وقت در API پنل برنمی‌گردد.
 
 ### ناشران
@@ -140,6 +144,9 @@ client.messages.create(model="claude-sonnet-4-5", max_tokens=1024, messages=[{"r
 5. **درآمد و تسویه:** در هر اجرا دو عدد ثبت می‌شود: سهم ناشر از فروش (`publisher_share`) و هزینهٔ مدل‌هایی که ایجنت صدا زده (`publisher_cost`). **هزینهٔ مدل از سهم ناشر کم می‌شود**؛ در همهٔ اجراها، حتی اجرای بی‌نتیجه، ناموفق یا آزمایشی. درآمد خالص ناشر برابر است با سهم فروش منهای هزینهٔ مدل، و مانده می‌تواند منفی هم بشود. ناشر سهم فروش، هزینهٔ مدل، درآمد خالص، نمودار ۳۰ روزه، مانده و تسویه‌ها را می‌بیند. ادمین در «ناشران» مانده‌ها را می‌بیند و «ثبت تسویه» می‌زند. اطلاعات تسویهٔ ناشر (مثلاً شماره شبا) رمزنگاری‌شده ذخیره می‌شود.
 
 - **بدهی ناشر:** مانده می‌تواند منفی شود. اگر بدهی از حد مجاز (`PUBLISHER_TEST_RUN_DEBT_LIMIT_USD`، پیش‌فرض ۵ دلار) بیشتر شود، اجرای آزمایشی ناشر بسته می‌شود تا وقتی که فروش یا واریز آن را جبران کند. اجرای مشتری‌ها ادامه دارد.
+- **جبران از کیف پول:** ناشر (نقش مالک یا مالی) با «جبران از کیف پول» در پنل ناشر مبلغی را از کیف پول یکی از اپ‌های سازمانش به حساب ناشر واریز می‌کند (`PUBLISHER_DEPOSIT_MIN_USD` تا `PUBLISHER_DEPOSIT_MAX_USD`). واریز در همان دفتر تسویه‌ها با نوع `deposit` ثبت می‌شود و مانده = درآمد خالص − پرداخت‌ها + واریزها. در کیف پول اپ تراکنشی از نوع `publisher_deposit` ثبت می‌شود.
+- **حداقل تسویه:** پلتفرم مانده را وقتی به `PUBLISHER_PAYOUT_MIN_USD` (پیش‌فرض ۱۰ دلار) برسد تسویه می‌کند. فرم «ثبت تسویه» مبلغ کمتر را نمی‌پذیرد.
+- **آزمایش رایگان:** ناشر یا ادمین برای هر ایجنت تعداد «واحد آزمایش رایگان» تعیین می‌کند (برای ناشر تا `PUBLISHER_MAX_FREE_TRIAL_UNITS`). هر سازمان یک بار آن را از صفحهٔ ایجنت در فروشگاه می‌گیرد. این واحدها ارزشی ندارند، پس ناشر سهمی از آن‌ها نمی‌برد و هزینهٔ مدلشان با خودش است.
 - ناشر از اجراهای مشتری‌ها فقط وضعیت و خطا را می‌بیند. خروجی و تنظیمات مشتری خصوصی می‌ماند.
 - سرویس و manifest ناشر باید روی اینترنت عمومی باشند و redirect دنبال نمی‌شود.
 - برای توسعهٔ ایجنت روی کامپیوتر خودتان می‌توانید `PUBLISHER_ALLOW_PRIVATE_ENDPOINTS=true` بگذارید. این تنظیم را هرگز روی سرور واقعی روشن نکنید.
@@ -163,6 +170,7 @@ X-Agent-Signature: sha256=<HMAC-SHA256("{timestamp}.{body}", signing_secret)>
   "instance": {"id": 7, "name": "رقبای فروشگاه"},
   "organization": {"id": 3, "name": "شرکت نمونه"},
   "config": {"domain": "https://shop.example", "competitors": ["a.example"]},
+  "input": null,
   "state": {"cursor": 12},
   "locale": "fa", "timezone": "Asia/Tehran",
   "platform": {
@@ -208,7 +216,7 @@ client = OpenAI(base_url=payload["platform"]["llm_base_url"], api_key=payload["p
 
 آدرس‌های `result_url` و `llm_base_url` از `APP_URL` ساخته می‌شوند، پس `APP_URL` باید آدرسی باشد که سرویس ایجنت به آن دسترسی دارد.
 
-**manifest ناشر** (اختیاری) یک فایل JSON با `name`، `tagline`، `description`، `icon`، `category`، `publisher: {name, url}`، `unit_name`، `max_units_per_run`، `endpoint_url` و `config_schema` است.
+**manifest ناشر** (اختیاری) یک فایل JSON با `name`، `tagline`، `description`، `icon`، `category`، `publisher: {name, url}`، `unit_name`، `max_units_per_run`، `run_input_label`، `endpoint_url` و `config_schema` است.
 
 **پارامترهای پایش خبر (ایجنت داخلی):**
 
@@ -236,9 +244,10 @@ client = OpenAI(base_url=payload["platform"]["llm_base_url"], api_key=payload["p
 درگاه با `BILLING_PAYMENT_GATEWAY` انتخاب می‌شود:
 
 - `manual`: سفارش در وضعیت «در انتظار» می‌ماند تا ادمین در پنل (سفارش‌ها ← «تأیید پرداخت») تأییدش کند.
+- `zarinpal`: درگاه زرین‌پال (API نسخهٔ ۴). مبلغ دلاری سفارش با نرخ `ZARINPAL_TOMAN_PER_USD` به تومان تبدیل و مشتری به صفحهٔ پرداخت فرستاده می‌شود. بعد از پرداخت، زرین‌پال مشتری را به `/payments/zarinpal/callback/{order}` برمی‌گرداند. آنجا پرداخت تأیید (verify)، کیف پول شارژ و مشتری به `{PANEL_URL}/wallet?payment=paid|failed` هدایت می‌شود. تنظیمات: `ZARINPAL_MERCHANT_ID`، `ZARINPAL_SANDBOX` و `ZARINPAL_TOMAN_PER_USD`.
 - `fake`: سفارش فوراً پرداخت‌شده ثبت می‌شود. فقط برای توسعه.
 
-برای اضافه‌کردن درگاه واقعی (زرین‌پال، Stripe، کریپتو و …)، `App\Services\Payments\PaymentGateway` را پیاده‌سازی کنید و آن را در `PaymentManager` ثبت کنید. callback درگاه باید در نهایت `OrderService::markPaid()` را صدا بزند. این متد idempotent است.
+برای اضافه‌کردن درگاه دیگر (Stripe، کریپتو و …)، `App\Services\Payments\PaymentGateway` را پیاده‌سازی کنید و آن را در `PaymentManager` ثبت کنید. callback درگاه باید در نهایت `OrderService::markPaid()` را صدا بزند. این متد idempotent است.
 
 ## ورود سازمانی و provisioning
 
@@ -275,6 +284,16 @@ php artisan serve
 1. وارد `/admin` شوید.
 2. در بخش «ارائه‌دهنده‌ها»، کلیدهای واقعی OpenAI / Anthropic / Google را اضافه کنید.
 3. قیمت‌ها و درصد سود را بررسی کنید.
+
+**تست با GapGPT** (وقتی به کلید ارائه‌دهنده‌های اصلی دسترسی ندارید): GapGPT یک gateway سازگار با OpenAI است که همهٔ این مدل‌ها را می‌فروشد. در `.env` این‌ها را بگذارید و seeder را دوباره اجرا کنید:
+
+```bash
+GAPGPT_API_KEY=...           # کلید پنل GapGPT
+GAPGPT_ROUTE_ALL_MODELS=true # همهٔ مدل‌ها از GapGPT صدا زده شوند
+php artisan db:seed --class=CatalogSeeder
+```
+
+ارائه‌دهندهٔ `gapgpt` با کلید شما ساخته می‌شود و همهٔ مدل‌ها به آن وصل می‌شوند. شناسهٔ مدل‌ها (`upstream_id`) باید با شناسه‌های GapGPT یکی باشد (`GET https://api.gapgpt.app/v1/models`). قیمت خرید را هم با قیمت GapGPT اصلاح کنید. مدل‌های Claude در این حالت فقط از `/v1/chat/completions` در دسترس‌اند. با `GAPGPT_ROUTE_ALL_MODELS=false` و اجرای دوبارهٔ seeder، مدل‌ها به ارائه‌دهندهٔ اصلی‌شان برمی‌گردند.
 
 تست‌ها:
 

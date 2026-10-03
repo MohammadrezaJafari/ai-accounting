@@ -258,6 +258,26 @@ class ExternalAgentTest extends TestCase
         $this->postJson("/agent-api/runs/{$run->id}/result", ['status' => 'succeeded', 'report' => 'late'], ['Authorization' => "Bearer {$token}"])->assertUnauthorized();
     }
 
+    public function test_a_manual_run_carries_the_input_the_agent_asks_for(): void
+    {
+        Sanctum::actingAs(User::factory()->inOrganization($this->organization, OrganizationRole::Developer)->create());
+        $instance = $this->competitorWatch();
+        $this->reply = Http::response(['status' => 'succeeded', 'report' => 'خلاصه', 'units' => 1]);
+
+        // Without a label the agent takes no input.
+        $this->postJson("/api/v1/agent-instances/{$instance->id}/run", ['input' => 'x'])->assertJsonValidationErrors('input');
+
+        $this->agent->update(['run_input_label' => 'لینکی که باید خلاصه شود']);
+        $this->getJson('/api/v1/agents')->assertJsonPath('data.0.run_input_label', 'لینکی که باید خلاصه شود');
+        $this->postJson("/api/v1/agent-instances/{$instance->id}/run")->assertJsonValidationErrors('input');
+
+        $this->postJson("/api/v1/agent-instances/{$instance->id}/run", ['input' => 'https://news.test/a'])->assertStatus(202)
+            ->assertJsonPath('data.input', 'https://news.test/a');
+
+        $this->assertSame('https://news.test/a', $this->sentPayload()['input']);
+        $this->assertSame('https://news.test/a', AgentRun::query()->sole()->input);
+    }
+
     public function test_ping_signs_the_request(): void
     {
         $this->reply = Http::response(['ok' => true]);

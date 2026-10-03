@@ -62,6 +62,48 @@ class AgentCreditService
     }
 
     /**
+     * Whether the organization may still claim the agent's free trial units.
+     */
+    public function trialAvailable(Organization $organization, Agent $agent): bool
+    {
+        return $agent->free_trial_units > 0 && ! AgentCreditTransaction::query()
+            ->where('organization_id', $organization->id)
+            ->where('agent_id', $agent->id)
+            ->where('type', AgentCreditTransaction::TYPE_TRIAL)
+            ->exists();
+    }
+
+    /**
+     * Add the agent's free trial units, once per organization. They carry no value, so runs
+     * on them earn the publisher nothing (it still pays their model cost).
+     */
+    public function claimTrial(Organization $organization, Agent $agent, User $by): AgentCredit
+    {
+        return DB::transaction(function () use ($organization, $agent, $by) {
+            $credit = $this->locked($organization, $agent);
+
+            if (! $this->trialAvailable($organization, $agent)) {
+                throw ValidationException::withMessages(['trial' => 'آزمایش رایگان این ایجنت برای سازمان شما در دسترس نیست.']);
+            }
+
+            $credit->units += $agent->free_trial_units;
+            $credit->save();
+
+            AgentCreditTransaction::query()->create([
+                'organization_id' => $organization->id,
+                'agent_id' => $agent->id,
+                'type' => AgentCreditTransaction::TYPE_TRIAL,
+                'units' => $agent->free_trial_units,
+                'value' => 0,
+                'description' => 'آزمایش رایگان',
+                'created_by' => $by->id,
+            ]);
+
+            return $credit;
+        });
+    }
+
+    /**
      * Hold one unit for a run; false when none is left.
      */
     public function reserve(AgentRun $run): bool

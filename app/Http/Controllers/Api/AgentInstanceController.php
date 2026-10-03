@@ -81,7 +81,11 @@ class AgentInstanceController extends Controller
             throw ValidationException::withMessages(['run' => 'یک اجرا همین حالا در جریان است.']);
         }
 
-        $run = $runner->start($instance, AgentRun::TRIGGER_MANUAL);
+        $data = $request->validate([
+            'input' => [$instance->agent->run_input_label ? 'required' : 'prohibited', 'nullable', 'string', 'max:4000'],
+        ], attributes: ['input' => $instance->agent->run_input_label ?? 'ورودی']);
+
+        $run = $runner->start($instance, AgentRun::TRIGGER_MANUAL, $data['input'] ?? null);
         RunAgent::dispatchAfterResponse($run);
 
         return (new AgentRunResource($run))->response()->setStatusCode(202);

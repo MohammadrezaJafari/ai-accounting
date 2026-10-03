@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\AiModel;
 use App\Models\Package;
 use App\Models\Provider;
+use App\Models\ProviderKey;
 use App\Support\Money;
 use Illuminate\Database\Seeder;
 
@@ -51,6 +52,8 @@ class CatalogSeeder extends Seeder
             'google' => ['name' => 'Google Gemini', 'base_url' => 'https://generativelanguage.googleapis.com/v1beta/openai'],
             'deepseek' => ['name' => 'DeepSeek', 'base_url' => 'https://api.deepseek.com/v1'],
             'xai' => ['name' => 'xAI', 'base_url' => 'https://api.x.ai/v1'],
+            // Iranian OpenAI-compatible reseller of every model above; handy when the official APIs are out of reach.
+            'gapgpt' => ['name' => 'GapGPT', 'base_url' => config('services.gapgpt.base_url')],
         ];
 
         foreach ($providers as $slug => $attributes) {
@@ -78,10 +81,11 @@ class CatalogSeeder extends Seeder
         ];
 
         $ids = Provider::query()->pluck('id', 'slug');
+        $this->seedGapGptKey($ids['gapgpt']);
 
         foreach ($models as [$provider, $name, $publicId, $upstreamId, $context, $input, $output, $cached, $cacheWrite]) {
             AiModel::query()->updateOrCreate(['public_id' => $publicId], [
-                'provider_id' => $ids[$provider],
+                'provider_id' => $ids[config('services.gapgpt.route_all_models') ? 'gapgpt' : $provider],
                 'name' => $name,
                 'upstream_id' => $upstreamId,
                 'context_window' => $context,
@@ -108,5 +112,22 @@ class CatalogSeeder extends Seeder
                 'sort_order' => $order,
             ]);
         }
+    }
+
+    /**
+     * Stores GAPGPT_API_KEY as the provider's upstream key, so a fresh install can be tested end to end.
+     */
+    private function seedGapGptKey(int $providerId): void
+    {
+        $apiKey = config('services.gapgpt.api_key');
+
+        if (blank($apiKey)) {
+            return;
+        }
+
+        ProviderKey::query()->updateOrCreate(['provider_id' => $providerId, 'name' => 'GapGPT'], [
+            'api_key' => $apiKey,
+            'is_active' => true,
+        ]);
     }
 }

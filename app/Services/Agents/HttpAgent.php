@@ -38,6 +38,8 @@ class HttpAgent implements AgentHandler
             'instance' => ['id' => $instance->id, 'name' => $instance->name],
             'organization' => ['id' => $run->organization_id, 'name' => $run->organization->name],
             'config' => (object) ($instance->config ?? []),
+            // What the customer typed for this manual run, when the agent asks for it.
+            'input' => $run->input,
             'state' => (object) ($instance->state ?? []),
             'locale' => 'fa',
             'timezone' => config('billing.display_timezone'),

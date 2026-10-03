@@ -9,6 +9,7 @@ class PaymentManager
     private const GATEWAYS = [
         'manual' => ManualGateway::class,
         'fake' => FakeGateway::class,
+        'zarinpal' => ZarinpalGateway::class,
     ];
 
     public function gateway(?string $name = null): PaymentGateway

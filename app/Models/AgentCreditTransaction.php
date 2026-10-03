@@ -18,6 +18,9 @@ class AgentCreditTransaction extends Model
 
     public const TYPE_ADJUSTMENT = 'adjustment';
 
+    /** Free units an organization claimed once to try the agent. */
+    public const TYPE_TRIAL = 'trial';
+
     protected function casts(): array
     {
         return [

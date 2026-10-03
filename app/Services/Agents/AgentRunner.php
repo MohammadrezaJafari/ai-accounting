@@ -30,13 +30,14 @@ class AgentRunner
         private ReportDelivery $delivery,
     ) {}
 
-    public function start(AgentInstance $instance, string $trigger): AgentRun
+    public function start(AgentInstance $instance, string $trigger, ?string $input = null): AgentRun
     {
         return $instance->runs()->create([
             'agent_id' => $instance->agent_id,
             'organization_id' => $instance->organization_id,
             'status' => AgentRun::STATUS_QUEUED,
             'trigger' => $trigger,
+            'input' => $input,
         ]);
     }
 

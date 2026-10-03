@@ -32,6 +32,8 @@ class PublisherAgentResource extends JsonResource
             'kind' => $this->kind?->value ?? 'report',
             'unit_name' => $this->unit_name,
             'max_units_per_run' => $this->max_units_per_run,
+            'free_trial_units' => $this->free_trial_units,
+            'run_input_label' => $this->run_input_label,
             'endpoint_url' => $this->endpoint_url,
             'timeout_seconds' => $this->timeout_seconds,
             'run_deadline_minutes' => $this->run_deadline_minutes,

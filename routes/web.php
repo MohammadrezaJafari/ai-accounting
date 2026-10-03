@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\OidcController;
+use App\Http\Controllers\Payments\ZarinpalController;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Support\Facades\Route;
 
@@ -13,3 +14,8 @@ Route::get('auth/oidc/redirect', [OidcController::class, 'redirect'])->middlewar
 Route::get('auth/oidc/callback', [OidcController::class, 'callback'])->middleware('throttle:30,1');
 Route::get('auth/oidc/logout', [OidcController::class, 'logout']);
 Route::post('auth/backchannel-logout', [OidcController::class, 'backchannelLogout'])->withoutMiddleware(ValidateCsrfToken::class);
+
+// The customer returns here from the Zarinpal payment page.
+Route::get('payments/zarinpal/callback/{order}', [ZarinpalController::class, 'callback'])
+    ->middleware('throttle:30,1')
+    ->name('payments.zarinpal.callback');

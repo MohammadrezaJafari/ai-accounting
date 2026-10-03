@@ -5,6 +5,7 @@ namespace App\Services\Publishers;
 use App\Models\Agent;
 use App\Models\AgentRun;
 use App\Models\Organization;
+use App\Models\PublisherPayout;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,12 +13,13 @@ use Illuminate\Database\Eloquent\Builder;
 /**
  * What a publisher's agents sold and earned. Each run records the publisher's share of its
  * revenue and the model cost charged back to it (every run, test runs included); earnings are
- * the difference and the balance is what has not been paid out yet (it can be negative).
+ * the difference and the balance is what has not been paid out yet (it can be negative);
+ * deposits from the publisher's own wallets raise it.
  */
 class PublisherEarnings
 {
     /**
-     * @return array{units: int, revenue: int, share: int, model_cost: int, earned: int, paid: int, balance: int, customers: int, live_agents: int}
+     * @return array{units: int, revenue: int, share: int, model_cost: int, earned: int, paid: int, deposits: int, balance: int, customers: int, live_agents: int}
      */
     public function summary(Organization $publisher): array
     {
@@ -28,7 +30,9 @@ class PublisherEarnings
             ->selectRaw('COALESCE(SUM(publisher_share), 0) as share, COALESCE(SUM(publisher_cost), 0) as model_cost')
             ->first();
         $earned = (int) $ledger->share - (int) $ledger->model_cost;
-        $paid = (int) $publisher->payouts()->sum('amount');
+        $ledgerTotals = $publisher->payouts()->toBase()->selectRaw('type, SUM(amount) as total')->groupBy('type')->pluck('total', 'type');
+        $paid = (int) ($ledgerTotals[PublisherPayout::TYPE_PAYOUT] ?? 0);
+        $deposits = (int) ($ledgerTotals[PublisherPayout::TYPE_DEPOSIT] ?? 0);
 
         return [
             'units' => (int) $sales->units,
@@ -37,7 +41,8 @@ class PublisherEarnings
             'model_cost' => (int) $ledger->model_cost,
             'earned' => $earned,
             'paid' => $paid,
-            'balance' => $earned - $paid,
+            'deposits' => $deposits,
+            'balance' => $earned - $paid + $deposits,
             'customers' => (int) $sales->customers,
             'live_agents' => $publisher->publishedAgents()->active()->count(),
         ];
@@ -45,11 +50,24 @@ class PublisherEarnings
 
     /**
      * Whether the publisher owes more than the platform allows for trying its agents: its test
-     * runs stop until sales (or a settlement) bring the balance back up. Customers' runs go on.
+     * runs stop until sales, a deposit (or a settlement) bring the balance back up. Customers' runs go on.
      */
     public function testRunsBlocked(Organization $publisher): bool
     {
         return $this->summary($publisher)['balance'] < -Money::fromUsd(config('billing.publishers.test_run_debt_limit_usd'));
+    }
+
+    /**
+     * Whether the balance has reached the minimum the platform pays out.
+     */
+    public function payoutDue(Organization $publisher): bool
+    {
+        return $this->summary($publisher)['balance'] >= self::payoutMinimum();
+    }
+
+    public static function payoutMinimum(): int
+    {
+        return Money::fromUsd(config('billing.publishers.payout_min_usd'));
     }
 
     /**

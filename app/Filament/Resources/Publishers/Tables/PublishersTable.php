@@ -32,9 +32,14 @@ class PublishersTable
                 TextColumn::make('model_cost')->label('هزینهٔ مدل')->state(fn (Organization $record) => Money::format($summary($record)['model_cost']))->extraAttributes(['dir' => 'ltr']),
                 TextColumn::make('earned')->label('درآمد خالص')->state(fn (Organization $record) => Money::format($summary($record)['earned']))->extraAttributes(['dir' => 'ltr']),
                 TextColumn::make('paid')->label('پرداخت‌شده')->state(fn (Organization $record) => Money::format($summary($record)['paid']))->extraAttributes(['dir' => 'ltr']),
+                TextColumn::make('deposits')->label('واریز ناشر')->state(fn (Organization $record) => Money::format($summary($record)['deposits']))->extraAttributes(['dir' => 'ltr'])->toggleable(),
                 TextColumn::make('balance')->label('مانده')
                     ->state(fn (Organization $record) => Money::format($summary($record)['balance']))
-                    ->color(fn (Organization $record) => $summary($record)['balance'] > 0 ? 'warning' : null)
+                    ->color(fn (Organization $record) => match (true) {
+                        $summary($record)['balance'] >= PublisherEarnings::payoutMinimum() => 'warning',
+                        $summary($record)['balance'] < 0 => 'danger',
+                        default => null,
+                    })
                     ->extraAttributes(['dir' => 'ltr']),
                 TextColumn::make('support_email')->label('ایمیل پشتیبانی')->extraAttributes(['dir' => 'ltr'])->toggleable(),
             ])
@@ -43,7 +48,8 @@ class PublishersTable
                     ->schema(fn (Organization $record) => [
                         TextEntry::make('payout_details')->label('اطلاعات پرداخت ناشر')
                             ->state($record->payout_details ?: 'ناشر اطلاعات پرداخت وارد نکرده است.'),
-                        Fields::usd('amount')->label('مبلغ')->required()->minValue(0.01)
+                        Fields::usd('amount')->label('مبلغ')->required()->minValue((float) Money::toUsd(PublisherEarnings::payoutMinimum()))
+                            ->helperText('حداقل مبلغ تسویه: '.Money::format(PublisherEarnings::payoutMinimum()))
                             ->default(Money::toUsd(max(0, $summary($record)['balance']))),
                         DateTimePicker::make('paid_at')->label('تاریخ پرداخت')->required()->default(now())->jalali(),
                         TextInput::make('reference')->label('شمارهٔ پیگیری')->maxLength(255)->extraInputAttributes(['dir' => 'ltr']),

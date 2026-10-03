@@ -19,6 +19,7 @@ class AgentRunResource extends JsonResource
             'agent_instance_id' => $this->agent_instance_id,
             'status' => $this->status,
             'trigger' => $this->trigger,
+            'input' => $this->input,
             'units' => $this->units,
             'items_found' => $this->items_found,
             'error' => $this->error,

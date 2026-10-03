@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * `allowed_providers` / `allowed_models` (null = unrestricted) scope a key to e.g. only Claude models.
  * `spent` is the lifetime total; the spend limit applies per `spend_limit_period`.
  */
-#[Fillable(['app_id', 'name', 'key_prefix', 'key_hash', 'allowed_providers', 'allowed_models', 'spend_limit', 'spend_limit_period', 'expires_at', 'is_active'])]
+#[Fillable(['app_id', 'name', 'key_prefix', 'key_hash', 'allowed_providers', 'allowed_models', 'spend_limit', 'spend_limit_period', 'rate_limit_per_minute', 'expires_at', 'is_active'])]
 #[Hidden(['key_hash'])]
 class AppApiKey extends Model
 {
@@ -32,6 +32,7 @@ class AppApiKey extends Model
             'expires_at' => 'datetime',
             'last_used_at' => 'datetime',
             'is_active' => 'boolean',
+            'rate_limit_per_minute' => 'integer',
         ];
     }
 
@@ -57,6 +58,14 @@ class AppApiKey extends Model
         }
 
         return ! $this->allowed_models || in_array($model->public_id, $this->allowed_models, true);
+    }
+
+    /**
+     * Requests per minute this key may send: its own limit or the platform default (0 = unlimited).
+     */
+    public function rateLimitPerMinute(): int
+    {
+        return $this->rate_limit_per_minute ?? (int) config('billing.gateway_rate_limit.per_minute');
     }
 
     public function isExpired(): bool
